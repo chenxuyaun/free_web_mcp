@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { AgentCard } from "@/components/AgentCard";
 import { ChainRecords } from "@/components/ChainRecords";
 import { DemoRunner } from "@/components/DemoRunner";
 import { HealthCard } from "@/components/HealthCard";
 import { StatusBoard } from "@/components/StatusBoard";
 import { Milestones } from "@/components/Milestones";
 import { StatsGrid } from "@/components/StatsGrid";
+import { getRegisteredAgent } from "@/lib/agent";
 import { getStats } from "@/lib/db";
 import { getSystemStatus } from "@/lib/status";
 
@@ -35,6 +37,11 @@ export default async function Home() {
           <h2 className="text-xl font-semibold mb-4">On-chain Feed</h2>
           <ChainRecords />
         </div>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold mb-4">Agent Identity (ERC-8004)</h2>
+        <AgentCard registration={getRegisteredAgent()} />
       </section>
 
       <section className="mt-10">

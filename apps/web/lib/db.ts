@@ -91,12 +91,18 @@ export function ensureSchema(db: Db): void {
       reward_tx      TEXT,
       created_at     TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
   // Migration: older DBs predate challenge_of (M1B challenge rewards).
   const voteCols = (db.pragma("table_info(votes)") as Array<{ name: string }>).map((c) => c.name);
   if (!voteCols.includes("challenge_of")) {
     db.exec("ALTER TABLE votes ADD COLUMN challenge_of TEXT");
   }
+
   // Migration: evidence rows predate greenfieldUri (Phase G decentralized storage).
   const evCols = (db.pragma("table_info(evidence)") as Array<{ name: string }>).map((c) => c.name);
   if (!evCols.includes("greenfield_uri")) {
@@ -504,4 +510,21 @@ export function priorSupportExists(evidenceId: string, validator: string, dbPath
     )
     .get(evidenceId, validator.toLowerCase());
   return row !== undefined;
+}
+
+// ---------- App meta kv (agent identity etc.) ----------
+
+export function getMeta(key: string, dbPath?: string): string | null {
+  const db = getDb(dbPath);
+  const row = db.prepare("SELECT value FROM app_meta WHERE key = ?").get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+
+export function setMeta(key: string, value: string, dbPath?: string): void {
+  const db = getDb(dbPath);
+  db.prepare(
+    "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  ).run(key, value);
 }
