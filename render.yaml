@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: free-web-mcp
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: "pip install uv && uv sync --frozen --no-dev"
+    startCommand: "uv run --no-sync free-web-mcp --transport http --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: LOG_LEVEL
+        value: INFO
+      - key: HTTP_TIMEOUT
+        value: 30
+      - key: MAX_CONTENT_LENGTH
+        value: 5000000
+      - key: SEARCH_MAX_RESULTS
+        value: 10
+      - key: RENDER_ENABLED
+        value: false
+      - key: PYTHON_VERSION
+        value: "3.12"

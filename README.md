@@ -47,6 +47,17 @@ curl http://localhost:8000/health      # -> {"status":"ok","service":"free-web-m
 
 MCP streamable-http 端点：`http://<host>:8000/mcp`。
 
+### 公开 Live URL（给评委 / 远程用户）
+
+两种方式，详见 [`docs/deploy_live_url.md`](docs/deploy_live_url.md)：
+
+- **Render（永久）**：`render.yaml` 已配好，导入 Render Blueprint 即可
+- **ngrok（即时）**：`ngrok http 8000` 立刻出一个 `https://*.ngrok-free.app`
+
+测活：`uv run python scripts/e2e_http_check.py https://<your-url>`
+
+---
+
 ### Docker
 
 ```bash
