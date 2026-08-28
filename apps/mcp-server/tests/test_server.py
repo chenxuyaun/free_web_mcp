@@ -47,6 +47,10 @@ async def test_well_known_lists_all_four_tools(client: httpx.AsyncClient) -> Non
         "web_fetch",
         "web_search_and_fetch",
         "web_summarize_with_sources",
+        "extract_claims",
+        "find_counter_evidence",
+        "create_evidence_record",
+        "get_evidence",
     }
 
 

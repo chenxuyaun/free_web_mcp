@@ -26,9 +26,12 @@ _OPINION_RE = re.compile(
 _INFERENCE_RE = re.compile(
     r"(因此|所以|意味着|这表明|thus|therefore|implies|suggests|indicates)", re.IGNORECASE
 )
-_NUMBER_RE = re.compile(r"\d+[.,]?\d*%|\$\s?\d+|\d+\s*(?:million|billion|亿|万|人|台|家)", re.IGNORECASE)
+_NUMBER_RE = re.compile(
+    r"\d+[.,]?\d*%|\$\s?\d+|\d+\s*(?:million|billion|亿|万|人|台|家)", re.IGNORECASE
+)
 _EVENT_RE = re.compile(
-    r"(发布|宣布|推出|收购|上市|launched|released|announced|acquired|listed|happened)", re.IGNORECASE
+    r"(发布|宣布|推出|收购|上市|launched|released|announced|acquired|listed|happened)",
+    re.IGNORECASE,
 )
 _DATE_RE = re.compile(
     r"(?:19|20)\d{2}\s*年|\b(?:19|20)\d{2}\b|january|february|march|april|may|june|july"
@@ -36,7 +39,8 @@ _DATE_RE = re.compile(
     re.IGNORECASE,
 )
 _RELATIONSHIP_RE = re.compile(
-    r"(与|和|相比|高于|低于|大于|小于|more than|less than|compared to|vs\.?|related to)", re.IGNORECASE
+    r"(与|和|相比|高于|低于|大于|小于|more than|less than|compared to|vs\.?|related to)",
+    re.IGNORECASE,
 )
 
 
@@ -141,7 +145,12 @@ class EvidenceApiClient:
                 error = body.get("error", {})
                 raise ToolError(
                     ErrorCode(str(error.get("type", "HTTP_ERROR"))),
-                    str(error.get("message", f"Evidence API returned HTTP {response.status_code}.")),
+                    str(
+                        error.get(
+                            "message",
+                            f"Evidence API returned HTTP {response.status_code}.",
+                        )
+                    ),
                 )
             except (ValueError, AttributeError):
                 raise ToolError(

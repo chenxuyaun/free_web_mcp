@@ -10,11 +10,8 @@ from pydantic import Field
 
 from free_web_mcp.deps import AppContext
 from free_web_mcp.errors import ErrorCode, ToolError, ToolErrorPayload
-from free_web_mcp.evidence import (
-    EvidenceApiClient,
-    counter_evidence_searches,
-    extract_claims,
-)
+from free_web_mcp import evidence as _evidence
+from free_web_mcp.evidence import EvidenceApiClient, counter_evidence_searches
 from free_web_mcp.logging import get_logger
 from free_web_mcp.models.page import (
     SearchAndFetchResponse,
@@ -350,7 +347,7 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
         ],
     ) -> dict[str, Any]:
         try:
-            claims = extract_claims(text)
+            claims = _evidence.extract_claims(text)
             return {
                 "success": True,
                 "count": len(claims),
@@ -396,17 +393,21 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
         supporting: Annotated[
             list[dict[str, str]],
             Field(
+                default_factory=list,
                 description=(
                     "Sources that support the claim. Each: {url, title, source_type, "
                     "published_at?, retrieved_at?, content_hash?}. source_type is one of "
                     "official/primary/major_media/professional/secondary/unknown/social."
-                )
+                ),
             ),
         ],
         contradicting: Annotated[
             list[dict[str, str]],
-            Field(description="Sources that contradict the claim (same shape as supporting)."),
-        ] = [],
+            Field(
+                default_factory=list,
+                description="Sources that contradict the claim (same shape as supporting).",
+            ),
+        ],
         cross_verified: Annotated[
             bool, Field(description="Whether an independent cross-check was performed.")
         ] = False,

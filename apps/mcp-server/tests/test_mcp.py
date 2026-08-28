@@ -44,6 +44,10 @@ async def test_list_tools() -> None:
         "web_fetch",
         "web_search_and_fetch",
         "web_summarize_with_sources",
+        "extract_claims",
+        "find_counter_evidence",
+        "create_evidence_record",
+        "get_evidence",
     }
 
 
