@@ -26,7 +26,7 @@ class AppContext:
         return cls(
             settings=s,
             client=client,
-            search=SearchService(settings=s),
+            search=SearchService(settings=s, client=client),
             fetch=FetchService(client, s, render),
             render=render,
         )

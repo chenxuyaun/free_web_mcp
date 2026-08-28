@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     max_content_length: int = 5_000_000
 
     search_max_results: int = 10
+    search_provider: str = "auto"  # auto | duckduckgo | bing | baidu
 
     render_enabled: bool = False
     render_timeout: int = 30
