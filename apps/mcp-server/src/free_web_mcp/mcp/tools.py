@@ -8,9 +8,9 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from free_web_mcp import evidence as _evidence
 from free_web_mcp.deps import AppContext
 from free_web_mcp.errors import ErrorCode, ToolError, ToolErrorPayload
-from free_web_mcp import evidence as _evidence
 from free_web_mcp.evidence import EvidenceApiClient, counter_evidence_searches
 from free_web_mcp.logging import get_logger
 from free_web_mcp.models.page import (
