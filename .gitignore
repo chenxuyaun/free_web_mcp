@@ -26,3 +26,4 @@ contracts/broadcast/
 Thumbs.db
 apps/web/data/
 .env.local
+test-results/
