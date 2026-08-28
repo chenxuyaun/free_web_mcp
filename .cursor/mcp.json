@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "free-web-mcp": {
-      "command": "uv",
-      "args": ["run", "--directory", "D:\\software\\code\\ideas\\list\\free_web_mcp", "free-web-mcp"]
-    }
-  }
-}
