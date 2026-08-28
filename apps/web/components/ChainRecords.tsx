@@ -16,7 +16,7 @@ interface FeedRecord {
 
 /** On-chain anchor feed: SQLite-indexed, chain-verified per record (M1C). */
 export async function ChainRecords() {
-  let records: FeedRecord[] = [];
+  const records: FeedRecord[] = [];
   let error: string | null = null;
 
   try {
