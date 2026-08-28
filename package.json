@@ -16,5 +16,13 @@
     "mcp:dev": "cd apps/mcp-server && uv run --no-sync free-web-mcp",
     "mcp:test": "cd apps/mcp-server && uv run --no-sync pytest -q",
     "demo": "tsx scripts/demo.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }

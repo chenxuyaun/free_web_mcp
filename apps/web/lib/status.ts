@@ -1,5 +1,7 @@
 import "server-only";
 
+import { countEvidence, getStats } from "./db";
+
 export type ServiceStatus = "ONLINE" | "OFFLINE" | "CONNECTED" | "DISCONNECTED";
 export type MilestoneKey =
   | "MCP_SERVER"
@@ -35,11 +37,13 @@ export interface SystemStatus {
 /** Live-derived status. Each probe is best-effort and isolated so a failing
  *  probe never blocks the others. */
 export async function getSystemStatus(): Promise<SystemStatus> {
-  const [mcp, web, evidence, blockchain] = await Promise.all([
+  const [mcp, web, evidence, blockchain, evidenceCount, stats] = await Promise.all([
     probeMcpServer(),
     probeWebEngine(),
     probeEvidenceEngine(),
     probeBlockchain(),
+    safeCountEvidence(),
+    safeOnChainCount(),
   ]);
 
   const services: ServiceRow[] = [mcp, web, evidence, blockchain];
@@ -48,10 +52,25 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     { key: "MCP_SERVER", label: "MCP Server", done: mcp.status === "ONLINE" },
     { key: "WEB_SEARCH", label: "Web Search", done: web.status === "ONLINE" },
     { key: "WEB_FETCH", label: "Web Fetch", done: web.status === "ONLINE" },
-    { key: "EVIDENCE_ENGINE", label: "Evidence Engine", done: evidence.status === "ONLINE" },
-    { key: "BLOCKCHAIN_REGISTRY", label: "Blockchain Registry", done: blockchain.status === "CONNECTED" },
-    { key: "FIRST_ONCHAIN_RECORD", label: "First On-chain Record", done: false },
+    {
+      key: "EVIDENCE_ENGINE",
+      label: "Evidence Engine",
+      done: evidence.status === "ONLINE",
+    },
+    { key: "FIRST_EVIDENCE", label: "First Evidence", done: evidenceCount > 0 },
+    {
+      key: "BLOCKCHAIN_REGISTRY",
+      label: "Blockchain Registry",
+      done: blockchain.status === "CONNECTED",
+    },
+    {
+      key: "FIRST_ONCHAIN_RECORD",
+      label: "First On-chain Record",
+      done: stats.onChainRecords > 0,
+    },
+    // Rendering this dashboard IS the proof of this milestone.
     { key: "DASHBOARD", label: "Dashboard", done: true },
+    // Not shipped yet — real current state, not placeholders.
     { key: "VALIDATOR", label: "Validator", done: false },
     { key: "VERI_TOKEN", label: "VERI Test Token", done: false },
   ];
@@ -63,6 +82,23 @@ export async function getSystemStatus(): Promise<SystemStatus> {
   };
 }
 
+async function safeCountEvidence(): Promise<number> {
+  try {
+    return countEvidence();
+  } catch {
+    return 0;
+  }
+}
+
+async function safeOnChainCount(): Promise<{ onChainRecords: number }> {
+  try {
+    const s = getStats();
+    return { onChainRecords: s.onChainRecords };
+  } catch {
+    return { onChainRecords: 0 };
+  }
+}
+
 async function probeMcpServer(): Promise<ServiceRow> {
   const url = process.env.MCP_SERVER_URL || "http://127.0.0.1:8765";
   try {
@@ -70,7 +106,8 @@ async function probeMcpServer(): Promise<ServiceRow> {
       signal: AbortSignal.timeout(2000),
       cache: "no-store",
     });
-    if (!res.ok) return { key: "MCP_SERVER", label: "MCP Server", status: "OFFLINE", detail: `HTTP ${res.status}` };
+    if (!res.ok)
+      return { key: "MCP_SERVER", label: "MCP Server", status: "OFFLINE", detail: `HTTP ${res.status}` };
     const j = (await res.json()) as { status?: string };
     return {
       key: "MCP_SERVER",
@@ -100,26 +137,46 @@ async function probeWebEngine(): Promise<ServiceRow> {
 }
 
 async function probeEvidenceEngine(): Promise<ServiceRow> {
-  // Phase 0: evidence engine is IN-PROCESS to the web app — it ships with the dashboard.
-  // Real bootstrap happens in Phase 3. For now mark ONLINE so the UI renders.
-  return {
-    key: "EVIDENCE_ENGINE",
-    label: "Evidence Engine",
-    status: "ONLINE",
-    detail: "in-process (Phase 0)",
-  };
+  // Real probe: evidence engine is online when its SQLite store opens and
+  // answers a count query (exercises engine + persistence together).
+  try {
+    const n = countEvidence();
+    return {
+      key: "EVIDENCE_ENGINE",
+      label: "Evidence Engine",
+      status: "ONLINE",
+      detail: `${n} evidence record${n === 1 ? "" : "s"}`,
+    };
+  } catch (e) {
+    return {
+      key: "EVIDENCE_ENGINE",
+      label: "Evidence Engine",
+      status: "OFFLINE",
+      detail: e instanceof Error ? e.message : String(e),
+    };
+  }
 }
 
 async function probeBlockchain(): Promise<ServiceRow> {
   const rpc = process.env.BSC_RPC_URL;
   const addr = process.env.EVIDENCE_REGISTRY_ADDRESS;
   if (!rpc) {
-    return { key: "BLOCKCHAIN", label: "Blockchain", status: "DISCONNECTED", detail: "BSC_RPC_URL not set" };
+    return {
+      key: "BLOCKCHAIN",
+      label: "Blockchain",
+      status: "DISCONNECTED",
+      detail: "BSC_RPC_URL not set",
+    };
   }
-  // Phase 5: actual chainId + contract code check lands here. Phase 0 reports
-  // DISCONNECTED until the contract is deployed, matching the spec.
+  // M6 adds a real chainId + contract-code check. Until the registry contract
+  // is deployed, "no address configured" is the DISCONNECTED signal.
   if (!addr) {
-    return { key: "BLOCKCHAIN", label: "Blockchain", status: "DISCONNECTED", detail: "no contract deployed" };
+    return {
+      key: "BLOCKCHAIN",
+      label: "Blockchain",
+      status: "DISCONNECTED",
+      detail: "no contract deployed",
+    };
   }
   return { key: "BLOCKCHAIN", label: "Blockchain", status: "CONNECTED", detail: addr };
 }
