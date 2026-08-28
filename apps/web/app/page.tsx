@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DemoRunner } from "@/components/DemoRunner";
 import { HealthCard } from "@/components/HealthCard";
 import { StatusBoard } from "@/components/StatusBoard";
 import { Milestones } from "@/components/Milestones";
@@ -23,6 +24,11 @@ export default async function Home() {
       </header>
 
       <HealthCard status={status.systemOnline} />
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold mb-4">One-click Demo</h2>
+        <DemoRunner />
+      </section>
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold mb-4">Project Status</h2>
