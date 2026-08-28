@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>free-web-mcp — WebMCP demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root { color-scheme: light dark; --fg: #111; --bg: #fafafa; --muted: #666; --accent: #1e6feb; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #111; --muted: #aaa; --accent: #58a6ff; } }
+  body { font: 15px/1.5 system-ui, -apple-system, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; color: var(--fg); background: var(--bg); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { background: rgba(127,127,127,0.1); padding: 12px 16px; border-radius: 6px; overflow: auto; }
+  .ok   { color: #2da44e; }
+  .err  { color: #cf222e; }
+  a     { color: var(--accent); }
+  h1    { margin: 0 0 4px; }
+  .sub  { color: var(--muted); margin: 0 0 24px; }
+  .card { border: 1px solid rgba(127,127,127,0.25); border-radius: 8px; padding: 16px; margin: 16px 0; }
+  button { padding: 6px 12px; border-radius: 4px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; font-size: 14px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  label { display: block; margin: 8px 0 4px; font-size: 13px; color: var(--muted); }
+  input, select { width: 100%; padding: 6px 8px; border: 1px solid rgba(127,127,127,0.3); border-radius: 4px; background: transparent; color: var(--fg); box-sizing: border-box; font: inherit; }
+  #log { white-space: pre-wrap; max-height: 320px; overflow: auto; }
+  .footer { color: var(--muted); font-size: 13px; margin-top: 48px; }
+</style>
+</head>
+<body>
+<h1>free-web-mcp — WebMCP demo</h1>
+<p class="sub">
+  This page proxies the four MCP tools from
+  <a href="https://github.com/chenxuyaun/free_web_mcp">free-web-mcp</a>
+  into the in-page AI via
+  <code>document.modelContext.registerTool(...)</code>. Open it in
+  Chrome 149+ with the <code>chrome://flags/#enable-webmcp-testing</code>
+  flag enabled and the AI in your DevTools console (or an attached WebMCP
+  inspector) can call the tools directly.
+</p>
+
+<div class="card">
+  <label for="endpoint">MCP endpoint URL</label>
+  <input id="endpoint" value="https://mononuclear-polytonally-clifton.ngrok-free.dev/mcp" />
+  <p style="font-size:13px;color:var(--muted);margin:8px 0 0;">
+    Default points at the public ngrok demo. Set to your own Render URL or
+    <code>http://127.0.0.1:8000/mcp</code> when running locally.
+  </p>
+  <p id="status" style="margin:8px 0 0;">Status: <span class="err">not registered yet</span></p>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 8px;">Quick interactive check (works without WebMCP)</h2>
+  <p style="margin:0 0 8px;color:var(--muted);font-size:13px;">
+    These buttons call the same Streamable-HTTP MCP endpoint from JavaScript
+    so you can verify the page works before you enable WebMCP.
+  </p>
+  <label for="q">Query</label>
+  <input id="q" value="model context protocol" />
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+    <button id="btnSearch">web_search</button>
+    <button id="btnHealth">/health</button>
+    <button id="btnWellKnown">/.well-known/mcp.json</button>
+  </div>
+  <pre id="log">(no calls yet)</pre>
+</div>
+
+<div class="footer">
+  Read the full <a href="https://github.com/chenxuyaun/free_web_mcp/blob/main/docs/AI_TOOLS_USED.md">AI tools used</a> ·
+  <a href="https://github.com/chenxuyaun/free_web_mcp/blob/main/SECURITY.md">Security</a> ·
+  <a href="https://github.com/chenxuyaun/free_web_mcp/blob/main/CHANGELOG.md">Changelog</a>
+</div>
+
+<script type="module">
+/* ----------------------------------------------------------------------
+ * free-web-mcp — WebMCP demo page
+ *
+ * Two halves:
+ *  1) Manual interactive check: fetch /health, /.well-known/mcp.json, and
+ *     web_search via raw JSON-RPC. Works in any browser.
+ *  2) WebMCP registration: if `document.modelContext` exists (Chrome 149+
+ *     with the WebMCP origin trial flag), register proxy tools. The in-page
+ *     AI can then call them without the user pasting JSON.
+ *
+ * Tool proxies forward each call to the remote MCP server by reusing the
+ * existing `Mcp-Session-Id` of the initialize handshake.
+ * -------------------------------------------------------------------- */
+
+const $ = (id) => document.getElementById(id);
+const log = (msg) => {
+  const el = $("log");
+  const ts = new Date().toISOString().slice(11, 19);
+  el.textContent = `[${ts}] ${msg}\n` + el.textContent;
+};
+
+let sessionId = null;
+let endpoint = $("endpoint").value.trim().replace(/\/+$/, "");
+
+/* ------ low-level JSON-RPC client ------ */
+async function rpc(method, params, { initialize = false } = {}) {
+  const headers = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
+  if (sessionId) headers["Mcp-Session-Id"] = sessionId;
+  const r = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ jsonrpc: "2.0", id: Math.random().toString(36).slice(2), method, params: params || {} }),
+  });
+  if (initialize) {
+    const sid = r.headers.get("Mcp-Session-Id");
+    if (sid) sessionId = sid;
+  }
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+  const text = await r.text();
+  // Server may return either JSON or SSE; we look for the first data: line.
+  const dataLine = text.split("\n").find((l) => l.startsWith("data: ")) || text;
+  return JSON.parse(dataLine.replace(/^data: /, ""));
+}
+
+async function callTool(name, args) {
+  const result = await rpc("tools/call", { name, arguments: args });
+  if (result.error) throw new Error(JSON.stringify(result.error));
+  const text = result.result?.content?.[0]?.text || JSON.stringify(result.result);
+  return JSON.parse(text);
+}
+
+/* ------ manual interactive check ------ */
+$("btnHealth").onclick = async () => {
+  try {
+    const r = await fetch(endpoint.replace(/\/mcp$/, "") + "/health");
+    log(`/health ${r.status} -> ${await r.text()}`);
+  } catch (e) { log("health err: " + e.message); }
+};
+$("btnWellKnown").onclick = async () => {
+  try {
+    const r = await fetch(endpoint.replace(/\/mcp$/, "") + "/.well-known/mcp.json");
+    const j = await r.json();
+    log(`/.well-known/mcp.json: ${j.tools.length} tools, version=${j.version}`);
+  } catch (e) { log("well-known err: " + e.message); }
+};
+$("btnSearch").onclick = async () => {
+  try {
+    const q = $("q").value.trim();
+    const out = await callTool("web_search", { query: q, max_results: 3 });
+    log(`web_search("${q}") -> ${out.results.length} results`);
+    for (const r of out.results) log(`  ${r.title.slice(0, 60)} | ${r.source_domain} (${r.confidence})`);
+  } catch (e) { log("search err: " + e.message); }
+};
+
+/* ------ WebMCP registration ------ */
+async function registerWebMcp() {
+  if (!("modelContext" in document) || !document.modelContext?.registerTool) {
+    $("status").innerHTML = 'Status: <span class="err">WebMCP API not available. Enable <code>chrome://flags/#enable-webmcp-testing</code> in Chrome 149+.</span>';
+    return;
+  }
+  // Initialize once so the session is established.
+  try {
+    await rpc("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "webmcp-demo.html", version: "0.1.0" },
+    }, { initialize: true });
+  } catch (e) {
+    $("status").innerHTML = `Status: <span class="err">initialize failed: ${e.message}</span>`;
+    return;
+  }
+
+  const toolProxy = (name, description, schema) => async (args) => {
+    try {
+      const out = await callTool(name, args);
+      return { content: [{ type: "text", text: JSON.stringify(out, null, 2) }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+    }
+  };
+
+  for (const def of [
+    {
+      name: "web_search",
+      description: "Search the web via DuckDuckGo. Each result has source_domain + confidence.",
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string" }, max_results: { type: "integer", minimum: 1, maximum: 10, default: 5 } },
+        required: ["query"],
+      },
+    },
+    {
+      name: "web_fetch",
+      description: "Fetch a URL and extract its main text + a meta block (domain_type, https, published_at).",
+      inputSchema: {
+        type: "object",
+        properties: { url: { type: "string" }, rendered: { type: "boolean", default: false } },
+        required: ["url"],
+      },
+    },
+    {
+      name: "web_search_and_fetch",
+      description: "Search the web, then fetch and extract the top-N URLs in one call.",
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string" }, max_results: { type: "integer", minimum: 1, maximum: 10, default: 5 }, rendered: { type: "boolean", default: false } },
+        required: ["query"],
+      },
+    },
+    {
+      name: "web_summarize_with_sources",
+      description: "Extract authors, citations, and links from a page; classify each link primary/secondary/tertiary.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          url: { type: "string" },
+          html: { type: "string" },
+          max_links: { type: "integer", minimum: 1, maximum: 200, default: 25 },
+        },
+      },
+    },
+  ]) {
+    await document.modelContext.registerTool({
+      name: def.name,
+      description: def.description,
+      inputSchema: def.inputSchema,
+      execute: toolProxy(def.name, def.description, def.inputSchema),
+    });
+  }
+  $("status").innerHTML = 'Status: <span class="ok">4 tools registered with WebMCP. In-page AI can now call them.</span>';
+}
+
+registerWebMcp();
+</script>
+</body>
+</html>

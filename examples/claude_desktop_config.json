@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "free-web-mcp": {
+      "url": "https://mononuclear-polytonally-clifton.ngrok-free.dev/mcp"
+    }
+  }
+}
