@@ -24,16 +24,37 @@ After deployment, judges can connect from:
 
 ---
 
-## Path A: Render (permanent)
+## Path A: Render (permanent) — two services (M1C)
 
-1. Push this repo to GitHub (already done if you cloned from `chenxuyaun/free_web_mcp`).
+`render.yaml` defines a **Blueprint with both services**:
+
+| Service | What | Health |
+| --- | --- | --- |
+| `free-web-mcp-web` | Next.js dashboard + evidence API (Node) | `GET /api/health` |
+| `free-web-mcp-mcp` | Python MCP server, 8 tools (Streamable HTTP on :10000) | `GET /health` |
+
+### Deploy steps
+
+1. Push this repo to GitHub (already done for `chenxuyaun/free_web_mcp`).
 2. Sign in to <https://render.com> with GitHub.
-3. **New → Blueprint** → pick this repo → Render reads `render.yaml` automatically.
-4. Click **Apply**. Render builds with `uv sync --frozen --no-dev` and starts on a public `*.onrender.com` URL.
-5. Wait for the first build to finish (3-5 minutes).
-6. Verify:
-   - `curl https://<your-service>.onrender.com/health` → `{"status":"ok","service":"free-web-mcp"}`
-   - `curl -X POST https://<your-service>.onrender.com/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"judge","version":"0"}}}'` → returns `serverInfo.name=free-web-mcp` plus session id.
+3. **New → Blueprint** → pick this repo → Render reads `render.yaml` and shows both services.
+4. Fill the `sync: false` secrets when prompted:
+   - `EVIDENCE_REGISTRY_ADDRESS` = `0xD4F14929A1694932439DDa1D481aA127f80185D7`
+   - `VERI_TOKEN_ADDRESS` = `0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da`
+   - `WALLET_PRIVATE_KEY` = your **testnet-only** private key (MetaMask export)
+5. Click **Apply**. First build takes 3-5 minutes per service.
+6. After deploy, edit the web service env `MCP_SERVER_URL` to the actual MCP URL
+   (`https://free-web-mcp-mcp.onrender.com` if names unchanged) and **Manual Deploy** once.
+7. Verify:
+   - `curl https://free-web-mcp-web.onrender.com/api/health`
+   - `curl https://free-web-mcp-mcp.onrender.com/health`
+   - Dashboard → Blockchain CONNECTED (BSC Testnet), Run Demo, Anchor, Validator votes all work remotely.
+
+### Caveats on Render free tier
+- Services **spin down after 15 min of inactivity**; next request cold-starts (~30-50 s).
+- SQLite lives on an ephemeral disk on free plans — evidence records reset on redeploys. Use the
+  **Run Demo** button to regenerate demo data after any deploy.
+- No Playwright/Chromium on Render — `RENDER_ENABLED=false` (v2 rendered fetch is local-only).
 
 ### Caveats on Render free tier
 - Service **spins down after 15 min of inactivity**; the next request takes ~30 s to cold start.

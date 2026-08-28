@@ -1,0 +1,48 @@
+services:
+  # Next.js dashboard + evidence API (M1C)
+  - type: web
+    name: free-web-mcp-web
+    runtime: node
+    plan: free
+    branch: main
+    rootDir: .
+    buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @free-web-mcp/web build"
+    startCommand: "pnpm --filter @free-web-mcp/web start"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_NAME
+        value: Free Web MCP
+      - key: BSC_NETWORK
+        value: bsc-testnet
+      - key: BSC_RPC_URL
+        value: https://data-seed-prebsc-1-s1.binance.org:8545
+      - key: BSC_EXPLORER_URL
+        value: https://testnet.bscscan.com
+      - key: EVIDENCE_REGISTRY_ADDRESS
+        sync: false   # 0xD4F14929A1694932439DDa1D481aA127f80185D7
+      - key: VERI_TOKEN_ADDRESS
+        sync: false   # 0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da
+      - key: WALLET_PRIVATE_KEY
+        sync: false   # testnet signer — set in Render dashboard, NEVER commit
+      - key: MCP_SERVER_URL
+        value: https://free-web-mcp-mcp.onrender.com
+
+  # Python MCP server (Streamable HTTP on :10000, 8 tools)
+  - type: web
+    name: free-web-mcp-mcp
+    runtime: python
+    plan: free
+    branch: main
+    rootDir: apps/mcp-server
+    buildCommand: "pip install uv && uv sync --frozen"
+    startCommand: "uv run --no-sync free-web-mcp --transport http --host 0.0.0.0 --port 10000"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: SEARCH_PROVIDER
+        value: auto

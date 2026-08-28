@@ -8,7 +8,7 @@ import {
   type WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { EVIDENCE_REGISTRY_ABI } from "./chains";
+import { EVIDENCE_REGISTERED_EVENT, EVIDENCE_REGISTRY_ABI } from "./chains";
 
 export interface AnchorResult {
   txHash: Hex;
@@ -107,4 +107,58 @@ export class EvidenceRegistryClient {
     if (!this.explorerUrl) return null;
     return `${this.explorerUrl}/tx/${txHash}`;
   }
+
+  /** Read recent EvidenceRegistered events (M1C: on-chain anchor feed).
+   *  Public BSC RPCs cap getLogs ranges, so we scan backwards in
+   *  CHUNK-sized windows until we have enough records or hit the chunk budget. */
+  async listAnchoredRecords(opts: ListRecordsOptions = {}): Promise<AnchoredRecord[]> {
+    const CHUNK = 1_000n;
+    const MAX_CHUNKS = 50; // ~50k blocks of history
+    const limit = opts.limit ?? 10;
+
+    const toBlock = await this.publicClient.getBlockNumber();
+    const floor = opts.fromBlock ?? 0n;
+    const found: AnchoredRecord[] = [];
+
+    let hi = toBlock;
+    for (let i = 0; i < MAX_CHUNKS && hi >= floor && found.length < limit; i++) {
+      const lo = hi - CHUNK + 1n > floor ? hi - CHUNK + 1n : floor;
+      const logs = await this.publicClient.getLogs({
+        address: this.registryAddress,
+        event: EVIDENCE_REGISTERED_EVENT,
+        fromBlock: lo,
+        toBlock: hi,
+      });
+      for (const log of logs) {
+        found.push({
+          evidenceHash: log.args.evidenceHash ?? "",
+          uri: log.args.uri ?? "",
+          timestamp: log.args.timestamp ?? 0n,
+          submitter: log.args.submitter ?? "",
+          version: log.args.version ?? "",
+          txHash: log.transactionHash ?? "",
+          blockNumber: log.blockNumber,
+        });
+        if (found.length >= limit) break;
+      }
+      hi = lo - 1n;
+    }
+    return found;
+  }
+}
+
+export interface AnchoredRecord {
+  evidenceHash: string;
+  uri: string;
+  timestamp: bigint;
+  submitter: string;
+  version: string;
+  txHash: string;
+  blockNumber: bigint;
+}
+
+export interface ListRecordsOptions {
+  /** Block to scan from. Defaults to the last 10,000 blocks. */
+  fromBlock?: bigint;
+  limit?: number;
 }

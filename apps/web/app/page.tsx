@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChainRecords } from "@/components/ChainRecords";
 import { DemoRunner } from "@/components/DemoRunner";
 import { HealthCard } from "@/components/HealthCard";
 import { StatusBoard } from "@/components/StatusBoard";
@@ -25,9 +26,15 @@ export default async function Home() {
 
       <HealthCard status={status.systemOnline} />
 
-      <section className="mt-10">
-        <h2 className="text-xl font-semibold mb-4">One-click Demo</h2>
-        <DemoRunner />
+      <section className="mt-10 grid gap-4 md:grid-cols-2">
+        <div>
+          <h2 className="text-xl font-semibold mb-4">One-click Demo</h2>
+          <DemoRunner />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold mb-4">On-chain Feed</h2>
+          <ChainRecords />
+        </div>
       </section>
 
       <section className="mt-10">

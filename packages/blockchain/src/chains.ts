@@ -87,3 +87,17 @@ export const EVIDENCE_REGISTRY_ABI = [
     type: "event",
   },
 ] as const;
+
+/** Standalone typed event descriptor for getLogs queries. */
+export const EVIDENCE_REGISTERED_EVENT = {
+  anonymous: false,
+  inputs: [
+    { indexed: true, internalType: "bytes32", name: "evidenceHash", type: "bytes32" },
+    { indexed: false, internalType: "string", name: "uri", type: "string" },
+    { indexed: false, internalType: "uint256", name: "timestamp", type: "uint256" },
+    { indexed: true, internalType: "address", name: "submitter", type: "address" },
+    { indexed: false, internalType: "string", name: "version", type: "string" },
+  ],
+  name: "EvidenceRegistered",
+  type: "event",
+} as const;
