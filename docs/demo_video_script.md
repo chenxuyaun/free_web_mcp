@@ -36,7 +36,7 @@ $ uv run free-web-mcp
 - 镜头：终端光标闪烁 2 秒，证明是真实启动
 - 切到 Cursor Settings → MCP，看到 "free-web-mcp" server 已 enabled
 
-## 3. 工具一：web_search（0:30–1:00）
+## 3. 工具一：web_search（0:30–1:05）
 
 > 「第一个工具 web_search，无需 API Key，直接打 DuckDuckGo。」
 
@@ -47,7 +47,9 @@ $ uv run free-web-mcp
 ```
 
 - 镜头：聚焦对话窗口
-- 工具返回后，让 AI 简单总结三条结果的标题 + 来源域名
+- **如果只返回 1 条**（这是真实会发生的情况——DuckDuckGo 9.x 默认后端并发高时会被限流）：旁白说「
+  注意有时候只能拿到 1 条，不是我截断了——这是 DuckDuckGo 公共搜索的反爬保护。所以下一版我们要把
+  SearchProvider 抽象成可插拔，多个引擎做聚合；这正是 v2 之后要做的」——这一句把观众带到后续 roadmap
 - 切到终端的 server log：观众能看到 `web_search query=...` 和 `search returned=N`
 
 ## 4. 工具二：web_fetch（1:00–1:30）
