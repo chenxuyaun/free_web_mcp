@@ -27,7 +27,16 @@ def main(argv: list[str] | None = None) -> None:
 
         from free_web_mcp.server import create_app
 
-        uvicorn.run(create_app(), host=args.host, port=args.port)
+        # Trust proxy headers (Host / X-Forwarded-*) so the server works
+        # behind ngrok / Render / any reverse proxy. Safe because we don't
+        # rely on Host for routing — all routes are path-based.
+        uvicorn.run(
+            create_app(),
+            host=args.host,
+            port=args.port,
+            proxy_headers=True,
+            forwarded_allow_ips="*",
+        )
     else:
         from free_web_mcp.mcp.server import get_mcp
 
