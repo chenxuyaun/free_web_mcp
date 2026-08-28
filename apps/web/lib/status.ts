@@ -70,9 +70,9 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     },
     // Rendering this dashboard IS the proof of this milestone.
     { key: "DASHBOARD", label: "Dashboard", done: true },
-    // Not shipped yet — real current state, not placeholders.
+    // VERI Token milestone: done when its address is configured (deployed).
     { key: "VALIDATOR", label: "Validator", done: false },
-    { key: "VERI_TOKEN", label: "VERI Test Token", done: false },
+    { key: "VERI_TOKEN", label: "VERI Test Token", done: Boolean(process.env.VERI_TOKEN_ADDRESS) },
   ];
 
   return {

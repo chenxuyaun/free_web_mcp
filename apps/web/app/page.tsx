@@ -50,6 +50,35 @@ export default async function Home() {
         <Milestones milestones={status.milestones} />
       </section>
 
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold mb-4">VERI Test Token</h2>
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
+              VERI
+            </span>
+            <span className="text-sm text-neutral-300">Verifiable Evidence</span>
+            <span className="text-xs text-neutral-500">— BSC Testnet</span>
+          </div>
+          <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+            <div>
+              <div className="text-xs text-neutral-500">Token Address</div>
+              <code className="break-all font-mono text-xs text-emerald-300">
+                {process.env.VERI_TOKEN_ADDRESS ?? "not deployed"}
+              </code>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500">Initial Supply</div>
+              <div className="font-mono text-xs">100,000,000 VERI</div>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-neutral-500">
+            Testnet-only reward token (spec §24-26). No DEX, no liquidity, no public
+            sale. Used for validator rewards in the next phase.
+          </p>
+        </div>
+      </section>
+
       <footer className="mt-16 text-xs text-neutral-600">
         <p>
           Status probes are live system checks, not hard-coded values.{" "}
