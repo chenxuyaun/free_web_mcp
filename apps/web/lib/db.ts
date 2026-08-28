@@ -149,6 +149,15 @@ export function getEvidencePackage(id: string, dbPath?: string): EvidencePackage
   return JSON.parse(row.package_json) as EvidencePackage;
 }
 
+/** The canonical SHA-256 evidence hash stored at create time. */
+export function getEvidenceHash(id: string, dbPath?: string): string | null {
+  const db = getDb(dbPath);
+  const row = db.prepare("SELECT hash FROM evidence WHERE id = ?").get(id) as
+    | { hash: string }
+    | undefined;
+  return row?.hash ?? null;
+}
+
 export function markAnchored(
   id: string,
   blockchain: NonNullable<EvidencePackage["blockchain"]>,

@@ -12,12 +12,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@free-web-mcp/blockchain": "workspace:*",
     "@free-web-mcp/evidence": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "lucide-react": "0.460.0",
     "next": "14.2.18",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "viem": "^2.56.0",
     "zod": "3.23.8"
   },
   "devDependencies": {

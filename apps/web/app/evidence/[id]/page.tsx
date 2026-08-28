@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AnchorButton } from "@/components/AnchorButton";
 import { CopyButton } from "@/components/CopyButton";
 import { getEvidencePackage } from "@/lib/db";
 
@@ -159,12 +160,13 @@ export default async function EvidenceDetailPage({
 
       <Section title="Blockchain">
         {!bc?.anchored ? (
-          <div>
+          <div className="space-y-4">
             <p className="text-sm text-neutral-500">
-              Not anchored yet. The Anchor Evidence action ships in Phase 6 — after the
-              EvidenceRegistry contract is deployed, this package&apos;s hash can be
-              registered on-chain with one click.
+              Not anchored yet. The SHA-256 hash of this evidence package can be
+              registered on the EvidenceRegistry contract (BSC Testnet / Anvil) —
+              the record becomes a permanent, public fingerprint.
             </p>
+            <AnchorButton id={pkg.id} alreadyAnchored={false} />
           </div>
         ) : (
           <div className="space-y-3 text-sm">
