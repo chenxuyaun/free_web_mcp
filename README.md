@@ -8,9 +8,10 @@ Free Web MCP —— 一个免费的 MCP Server，为 Claude / Cursor / 其他 MC
 
 | Tool | 说明 |
 | --- | --- |
-| `web_search(query, max_results=5)` | DuckDuckGo 搜索，返回 `{title,url,snippet,source}` 列表 |
-| `web_fetch(url, rendered=False)` | 抓取网页并提取正文，返回 `{url,title,content,text_length}`；`rendered=True` 时驱动 headless Chromium（需 `RENDER_ENABLED=true`） |
+| `web_search(query, max_results=5)` | DuckDuckGo 搜索，返回 `{title,url,snippet,source,source_domain,confidence}` |
+| `web_fetch(url, rendered=False)` | 抓取网页并提取正文，返回 `{url,title,content,text_length,meta}`；`rendered=True` 时驱动 headless Chromium（需 `RENDER_ENABLED=true`） |
 | `web_search_and_fetch(query, max_results=5, rendered=False)` | 搜索后逐个抓取 Top N 结果正文 |
+| `web_summarize_with_sources(url=None, html=None, max_links=25)` | 抽取作者 / 引用 / 链接；按 **一手 / 二手 / 三手** 分类，让 AI 自主判断可信度 |
 
 ## 快速开始
 

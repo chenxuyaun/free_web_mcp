@@ -39,7 +39,12 @@ async def test_list_tools() -> None:
         await session.initialize()
         listing = await session.list_tools()
         names = [t.name for t in listing.tools]
-    assert set(names) == {"web_search", "web_fetch", "web_search_and_fetch"}
+    assert set(names) == {
+        "web_search",
+        "web_fetch",
+        "web_search_and_fetch",
+        "web_summarize_with_sources",
+    }
 
 
 async def test_web_search_success() -> None:
@@ -48,7 +53,14 @@ async def test_web_search_success() -> None:
     assert payload["query"] == "q"
     assert len(payload["results"]) == 2
     first = payload["results"][0]
-    assert set(first) == {"title", "url", "snippet", "source"}
+    assert set(first) == {
+        "title",
+        "url",
+        "snippet",
+        "source",
+        "source_domain",
+        "confidence",
+    }
 
 
 @respx.mock

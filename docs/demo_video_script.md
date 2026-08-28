@@ -116,11 +116,40 @@ $ curl http://localhost:8000/health
 {"status":"ok","service":"free-web-mcp"}
 ```
 
-## 8. 收尾（2:55–3:05）
+## 8. v3 元数据：让 AI 知道每条结果"可不可信"（2:55–3:25）
+
+> 「v3 解决了上一个反复提到的隐患：AI 拿到 web_fetch 的结果就当事实用。
+> 我们的做法是——把来源信号直接嵌进返回，让 AI 自己判断。」
+
+调用：
+
+```
+用 web_fetch 抓 https://en.wikipedia.org/wiki/Model_Context_Protocol
+把返回的 meta 块给我，逐项解读这个来源的可靠性。
+```
+
+- 镜头：聊天框里 JSON 返回，重点高亮 `meta` 块：`domain_type=wiki`、`https=true`、`published_at=2024-11-XX`、`author=Wikipedia Contributors`、`content_length_raw=...`、`fetched_at=现在时间`
+- AI 据此回答：「这是 wikipedia 的 2024 年页面，HTTPS 安全，但 wikipedia 是二手资料，要找 Anthropic 官方原文才算一手」——**这就是核心理念的演示**
+
+## 9. v3 web_summarize_with_sources：把页面里的引用按一/二/三手分类（3:25–3:55）
+
+> 「另一个工具直接帮你做证据分级。」
+
+调用：
+
+```
+用 web_summarize_with_sources 抓 https://en.wikipedia.org/wiki/Model_Context_Protocol
+把里面所有外链按 primary/secondary/tertiary 分类给我。
+```
+
+- 镜头：返回 JSON 中 `links[].tier` 字段 + `counts: {primary, secondary, tertiary}`
+- AI 据此说：「Wikipedia 内链是 primary；arxiv.org / nature.com 是 secondary（权威学术）；reddit 引用是 tertiary（用户内容）」
+
+## 10. 收尾（3:55–4:05）
 
 - 仓库卡片：`github.com/chenxuyaun/free_web_mcp`
 - 三个关键词：`free / open source / MCP compatible`
-- 「点 star 关注 v3：缓存、限流、Markdown 输出、SEO 摘要。评论区告诉我你最想用哪个工具。」
+- 「点 star 关注 v3 后续：Markdown 输出、PDF 抽取、CSS 选择器精准抓取、跨页内容合并。评论区告诉我你最想用哪个工具。」
 
 ## 录后
 

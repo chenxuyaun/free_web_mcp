@@ -8,6 +8,8 @@ class SearchResult(BaseModel):
     url: str
     snippet: str = ""
     source: str
+    source_domain: str = ""
+    confidence: float = 0.0  # 0.0-1.0, simple heuristic; consumers must not treat as ground truth
 
 
 class SearchResponse(BaseModel):
