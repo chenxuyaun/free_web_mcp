@@ -1,6 +1,8 @@
 import "server-only";
 
-import { countEvidence, getStats } from "./db";
+import { EvidenceRegistryClient } from "@free-web-mcp/blockchain";
+import { getRegistryConfig } from "./blockchain";
+import { countEvidence, getStats, listValidators } from "./db";
 
 export type ServiceStatus = "ONLINE" | "OFFLINE" | "CONNECTED" | "DISCONNECTED";
 export type MilestoneKey =
@@ -37,13 +39,14 @@ export interface SystemStatus {
 /** Live-derived status. Each probe is best-effort and isolated so a failing
  *  probe never blocks the others. */
 export async function getSystemStatus(): Promise<SystemStatus> {
-  const [mcp, web, evidence, blockchain, evidenceCount, stats] = await Promise.all([
+  const [mcp, web, evidence, blockchain, evidenceCount, stats, validatorCount] = await Promise.all([
     probeMcpServer(),
     probeWebEngine(),
     probeEvidenceEngine(),
     probeBlockchain(),
     safeCountEvidence(),
     safeOnChainCount(),
+    safeValidatorCount(),
   ]);
 
   const services: ServiceRow[] = [mcp, web, evidence, blockchain];
@@ -70,8 +73,8 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     },
     // Rendering this dashboard IS the proof of this milestone.
     { key: "DASHBOARD", label: "Dashboard", done: true },
-    // VERI Token milestone: done when its address is configured (deployed).
-    { key: "VALIDATOR", label: "Validator", done: false },
+    // Real probe: at least one validator has voted (H5).
+    { key: "VALIDATOR", label: "Validator", done: validatorCount > 0 },
     { key: "VERI_TOKEN", label: "VERI Test Token", done: Boolean(process.env.VERI_TOKEN_ADDRESS) },
   ];
 
@@ -96,6 +99,14 @@ async function safeOnChainCount(): Promise<{ onChainRecords: number }> {
     return { onChainRecords: s.onChainRecords };
   } catch {
     return { onChainRecords: 0 };
+  }
+}
+
+async function safeValidatorCount(): Promise<number> {
+  try {
+    return listValidators().length;
+  } catch {
+    return 0;
   }
 }
 
@@ -160,23 +171,40 @@ async function probeEvidenceEngine(): Promise<ServiceRow> {
 async function probeBlockchain(): Promise<ServiceRow> {
   const rpc = process.env.BSC_RPC_URL;
   const addr = process.env.EVIDENCE_REGISTRY_ADDRESS;
-  if (!rpc) {
+  if (!rpc || !addr) {
     return {
       key: "BLOCKCHAIN",
       label: "Blockchain",
       status: "DISCONNECTED",
-      detail: "BSC_RPC_URL not set",
+      detail: !rpc ? "BSC_RPC_URL not set" : "no contract deployed",
     };
   }
-  // M6 adds a real chainId + contract-code check. Until the registry contract
-  // is deployed, "no address configured" is the DISCONNECTED signal.
-  if (!addr) {
+  // Real probe: read chainId and contract bytecode via viem (H4).
+  try {
+    const cfg = getRegistryConfig();
+    const client = new EvidenceRegistryClient(cfg);
+    const chainId = await client.getChainId();
+    const hasCode = await client.hasContract();
+    if (!hasCode) {
+      return {
+        key: "BLOCKCHAIN",
+        label: "Blockchain",
+        status: "DISCONNECTED",
+        detail: `no contract code at ${addr} (chainId ${chainId})`,
+      };
+    }
+    return {
+      key: "BLOCKCHAIN",
+      label: "Blockchain",
+      status: "CONNECTED",
+      detail: `${cfg.chain.name} (chainId ${chainId}) — ${addr.slice(0, 10)}…`,
+    };
+  } catch (e) {
     return {
       key: "BLOCKCHAIN",
       label: "Blockchain",
       status: "DISCONNECTED",
-      detail: "no contract deployed",
+      detail: e instanceof Error ? e.message : String(e),
     };
   }
-  return { key: "BLOCKCHAIN", label: "Blockchain", status: "CONNECTED", detail: addr };
 }

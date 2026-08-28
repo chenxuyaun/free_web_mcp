@@ -1,6 +1,6 @@
 {
   "name": "free-web-mcp",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Free Web MCP - Verifiable Web Evidence Network (MCP server + evidence engine + Next.js dashboard + BSC Testnet anchoring)",
   "packageManager": "pnpm@10.33.0",
@@ -10,15 +10,22 @@
   "scripts": {
     "dev": "pnpm --filter @free-web-mcp/web dev",
     "build": "pnpm -r build",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint .",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "mcp:dev": "cd apps/mcp-server && uv run --no-sync free-web-mcp",
     "mcp:test": "cd apps/mcp-server && uv run --no-sync pytest -q",
-    "demo": "tsx scripts/demo.ts"
+    "demo": "tsx scripts/demo.ts",
+    "dev:all": "concurrently -k -n mcp,web -c yellow,cyan \"pnpm mcp:dev\" \"pnpm dev\""
   },
   "devDependencies": {
-    "tsx": "^4.23.12"
+    "@eslint/js": "^10.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.9.1",
+    "tsx": "^4.23.12",
+    "typescript-eslint": "^8.68.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

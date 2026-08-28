@@ -1,6 +1,6 @@
 [project]
 name = "free-web-mcp"
-version = "0.1.0"
+version = "0.4.0"
 description = "Free Web MCP - MCP server providing free web search and web fetch tools"
 license = { text = "MIT" }
 requires-python = ">=3.12"

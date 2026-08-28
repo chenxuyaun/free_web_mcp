@@ -7,9 +7,26 @@ import { createHash } from "node:crypto";
 //   anvil --port 8545
 // and the EvidenceRegistry deployed at the default address
 // (forge script script/Deploy.s.sol:DeployEvidenceRegistry --rpc-url http://127.0.0.1:8545 --broadcast).
+// When Anvil is unreachable the suite skips instead of failing.
 
 const RPC = "http://127.0.0.1:8545";
 const REGISTRY = "0x5FbDB2315678afecb367f032d93F642f64180aa3" as `0x${string}`;
+
+async function anvilReachable(): Promise<boolean> {
+  try {
+    const r = await fetch(RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+      signal: AbortSignal.timeout(1500),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+const skip = !(await anvilReachable());
 
 const run = () => new EvidenceRegistryClient({
   rpcUrl: RPC,
@@ -21,7 +38,7 @@ const run = () => new EvidenceRegistryClient({
 
 const sha = (s: string) => `0x${createHash("sha256").update(s).digest("hex")}` as `0x${string}`;
 
-describe("EvidenceRegistryClient (Anvil)", () => {
+describe.skipIf(skip)("EvidenceRegistryClient (Anvil)", () => {
   it("reads the chain id (97 for BSC Testnet config, 31337 for anvil)", async () => {
     const c = run();
     const id = await c.getChainId();
