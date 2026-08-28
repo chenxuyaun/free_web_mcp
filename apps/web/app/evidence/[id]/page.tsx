@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AnchorButton } from "@/components/AnchorButton";
 import { CopyButton } from "@/components/CopyButton";
+import { ValidatorPanel } from "@/components/ValidatorPanel";
 import { getEvidencePackage } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -156,6 +157,10 @@ export default async function EvidenceDetailPage({
             ))}
           </ul>
         )}
+      </Section>
+
+      <Section title="Validator Vote (spec §25-26)">
+        <ValidatorPanel id={pkg.id} />
       </Section>
 
       <Section title="Blockchain">

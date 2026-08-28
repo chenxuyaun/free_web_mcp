@@ -42,11 +42,23 @@ function pool(): Map<string, Db> {
 
 export function getDb(dbPath: string = process.env.DB_PATH || DEFAULT_DB_PATH): Db {
   const existing = pool().get(dbPath);
-  if (existing) return existing;
+  if (existing) {
+    // Schema may have evolved since the connection was first opened
+    // (e.g. new tables added while the dev server kept running).
+    ensureSchema(existing);
+    return existing;
+  }
 
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
+  ensureSchema(db);
+  pool().set(dbPath, db);
+  return db;
+}
+
+/** Idempotent schema bootstrap — safe to run on every open, also used by tests. */
+export function ensureSchema(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS evidence (
       id            TEXT PRIMARY KEY,
@@ -59,9 +71,27 @@ export function getDb(dbPath: string = process.env.DB_PATH || DEFAULT_DB_PATH): 
       package_json  TEXT NOT NULL,
       created_at    TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS validators (
+      address              TEXT PRIMARY KEY,
+      reputation           REAL NOT NULL DEFAULT 0,
+      verified_claims      INTEGER NOT NULL DEFAULT 0,
+      successful_challenges INTEGER NOT NULL DEFAULT 0,
+      total_votes          INTEGER NOT NULL DEFAULT 0,
+      created_at           TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS votes (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      evidence_id    TEXT NOT NULL,
+      validator      TEXT NOT NULL,
+      vote           TEXT NOT NULL,
+      correct        INTEGER NOT NULL DEFAULT 0,
+      reward_amount  TEXT,
+      reward_tx      TEXT,
+      created_at     TEXT NOT NULL
+    );
   `);
-  pool().set(dbPath, db);
-  return db;
 }
 
 export function closeDb(dbPath?: string): void {
@@ -206,4 +236,176 @@ export function countEvidence(dbPath?: string): number {
   const db = getDb(dbPath);
   const row = db.prepare("SELECT COUNT(*) AS c FROM evidence").get() as { c: number };
   return row.c;
+}
+
+// ---------- Validator (spec §25-26) ----------
+
+export type ValidatorVote = "SUPPORT" | "CONTRADICT" | "UNCERTAIN";
+
+export interface VoteRecord {
+  id: number;
+  evidenceId: string;
+  validator: string;
+  vote: ValidatorVote;
+  correct: boolean;
+  rewardAmount: string | null;
+  rewardTx: string | null;
+  createdAt: string;
+}
+
+export interface ValidatorStats {
+  address: string;
+  reputation: number;
+  verifiedClaims: number;
+  successfulChallenges: number;
+  totalVotes: number;
+}
+
+/** Map a system assessment status to the validator vote it implies
+ *  (SUPPORTED/LIKELY_TRUE → SUPPORT; CONTRADICTED → CONTRADICT; else UNCERTAIN). */
+export function assessmentToExpectedVote(status: string): ValidatorVote {
+  if (status === "SUPPORTED" || status === "LIKELY_TRUE") return "SUPPORT";
+  if (status === "CONTRADICTED") return "CONTRADICT";
+  return "UNCERTAIN";
+}
+
+export function recordVote(input: {
+  evidenceId: string;
+  validator: string;
+  vote: ValidatorVote;
+  rewardAmount?: string | null;
+  rewardTx?: string | null;
+}, dbPath?: string): VoteRecord {
+  const db = getDb(dbPath);
+  const pkg = getEvidencePackage(input.evidenceId, dbPath);
+  if (!pkg) throw new Error(`Evidence ${input.evidenceId} not found.`);
+
+  const expected = assessmentToExpectedVote(pkg.assessment.status);
+  const correct = input.vote === expected;
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `INSERT INTO votes (evidence_id, validator, vote, correct, reward_amount, reward_tx, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    input.evidenceId,
+    input.validator.toLowerCase(),
+    input.vote,
+    correct ? 1 : 0,
+    input.rewardAmount ?? null,
+    input.rewardTx ?? null,
+    now,
+  );
+
+  // Upsert validator stats
+  db.prepare(
+    `INSERT INTO validators (address, reputation, verified_claims, successful_challenges, total_votes, created_at)
+     VALUES (?, ?, ?, ?, 1, ?)
+     ON CONFLICT(address) DO UPDATE SET
+       reputation = reputation + ?,
+       verified_claims = verified_claims + ?,
+       successful_challenges = successful_challenges + ?,
+       total_votes = total_votes + 1`,
+  ).run(
+    input.validator.toLowerCase(),
+    correct ? 1 : 0,
+    correct ? 1 : 0,
+    input.vote === "CONTRADICT" && correct ? 1 : 0,
+    now,
+    correct ? 1 : 0,
+    correct ? 1 : 0,
+    input.vote === "CONTRADICT" && correct ? 1 : 0,
+  );
+
+  const row = db
+    .prepare("SELECT * FROM votes WHERE id = last_insert_rowid()")
+    .get() as {
+    id: number;
+    evidence_id: string;
+    validator: string;
+    vote: string;
+    correct: number;
+    reward_amount: string | null;
+    reward_tx: string | null;
+    created_at: string;
+  };
+  return {
+    id: row.id,
+    evidenceId: row.evidence_id,
+    validator: row.validator,
+    vote: row.vote as ValidatorVote,
+    correct: row.correct === 1,
+    rewardAmount: row.reward_amount,
+    rewardTx: row.reward_tx,
+    createdAt: row.created_at,
+  };
+}
+
+export function getValidatorStats(address: string, dbPath?: string): ValidatorStats | null {
+  const db = getDb(dbPath);
+  const row = db
+    .prepare("SELECT * FROM validators WHERE address = ?")
+    .get(address.toLowerCase()) as
+    | {
+        address: string;
+        reputation: number;
+        verified_claims: number;
+        successful_challenges: number;
+        total_votes: number;
+      }
+    | undefined;
+  if (!row) return null;
+  return {
+    address: row.address,
+    reputation: row.reputation,
+    verifiedClaims: row.verified_claims,
+    successfulChallenges: row.successful_challenges,
+    totalVotes: row.total_votes,
+  };
+}
+
+export function listVotes(dbPath?: string): VoteRecord[] {
+  const db = getDb(dbPath);
+  const rows = db
+    .prepare("SELECT * FROM votes ORDER BY created_at DESC LIMIT 50")
+    .all() as Array<{
+    id: number;
+    evidence_id: string;
+    validator: string;
+    vote: string;
+    correct: number;
+    reward_amount: string | null;
+    reward_tx: string | null;
+    created_at: string;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    evidenceId: r.evidence_id,
+    validator: r.validator,
+    vote: r.vote as ValidatorVote,
+    correct: r.correct === 1,
+    rewardAmount: r.reward_amount,
+    rewardTx: r.reward_tx,
+    createdAt: r.created_at,
+  }));
+}
+
+export function listValidators(dbPath?: string): ValidatorStats[] {
+  const db = getDb(dbPath);
+  const rows = db
+    .prepare("SELECT * FROM validators ORDER BY reputation DESC LIMIT 20")
+    .all() as Array<{
+    address: string;
+    reputation: number;
+    verified_claims: number;
+    successful_challenges: number;
+    total_votes: number;
+  }>;
+  return rows.map((r) => ({
+    address: r.address,
+    reputation: r.reputation,
+    verifiedClaims: r.verified_claims,
+    successfulChallenges: r.successful_challenges,
+    totalVotes: r.total_votes,
+  }));
 }
