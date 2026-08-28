@@ -105,6 +105,16 @@ forge script script/Deploy.s.sol:DeployEvidenceRegistry \
 The deployed address goes into `.env.local` as `EVIDENCE_REGISTRY_ADDRESS`.
 The dashboard then flips `Blockchain → CONNECTED` and the Anchor button works.
 
+### Live deployment (BSC Testnet)
+
+| | |
+| --- | --- |
+| Contract | `0xD4F14929A1694932439DDa1D481aA127f80185D7` |
+| Network | BSC Testnet (chainId 97) |
+| Deploy TX | [0xe8aa0919…ffd1](https://testnet.bscscan.com/tx/0xe8aa0919462ae32101b06f3bcfb727fba1ba1ae2bb446d37079531d54c54ffd1) |
+| Anchor TX (EV-000006) | [0xe8aa0919…ffd1](https://testnet.bscscan.com/tx/0xe8aa0919462ae32101b06f3bcfb727fba1ba1ae2bb446d37079531d54c54ffd1) |
+| Verify | `cast call <contract> "exists(bytes32)(bool)" 0x3112…f3db8 --rpc-url <testnet-rpc>` → `true` |
+
 ---
 
 ## MCP tools (Python server)
