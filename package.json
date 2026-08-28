@@ -16,10 +16,12 @@
     "mcp:dev": "cd apps/mcp-server && uv run --no-sync free-web-mcp",
     "mcp:test": "cd apps/mcp-server && uv run --no-sync pytest -q",
     "demo": "tsx scripts/demo.ts",
-    "dev:all": "concurrently -k -n mcp,web -c yellow,cyan \"pnpm mcp:dev\" \"pnpm dev\""
+    "dev:all": "concurrently -k -n mcp,web -c yellow,cyan \"pnpm mcp:dev\" \"pnpm dev\"",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@typescript-eslint/eslint-plugin": "^8.68.0",
     "@typescript-eslint/parser": "^8.68.0",
     "concurrently": "^10.0.5",
@@ -30,6 +32,9 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "better-sqlite3"
-    ]
+    ],
+    "patchedDependencies": {
+      "@bnb-chain/reed-solomon": "patches/@bnb-chain__reed-solomon.patch"
+    }
   }
 }

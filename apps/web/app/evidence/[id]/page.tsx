@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AnchorButton } from "@/components/AnchorButton";
 import { PublishButton } from "@/components/PublishButton";
 import { CopyButton } from "@/components/CopyButton";
+import { ExportButton } from "@/components/ExportButton";
 import { Timeline } from "@/components/Timeline";
 import { ValidatorPanel } from "@/components/ValidatorPanel";
 import { getEvidencePackage } from "@/lib/db";
@@ -55,7 +56,10 @@ export default async function EvidenceDetailPage({
         <Link href="/evidence" className="text-sm text-neutral-400 hover:text-neutral-200">
           ← All evidence
         </Link>
-        <span className="font-mono text-sm text-neutral-500">{pkg.id}</span>
+        <div className="flex items-center gap-2">
+          <ExportButton id={pkg.id} />
+          <span className="font-mono text-sm text-neutral-500">{pkg.id}</span>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">

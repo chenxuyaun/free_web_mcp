@@ -38,9 +38,14 @@ const VALID_CLAIM_TYPES: ClaimType[] = [
   "inference",
 ];
 
-/** GET /api/evidence — list + statistics (spec §20). */
-export async function GET() {
-  const items = listEvidence();
+/** GET /api/evidence?status=&q= — list + statistics (spec §20). */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const items = listEvidence({
+    status: searchParams.get("status") || undefined,
+    q: searchParams.get("q") || undefined,
+    limit: 100,
+  });
   const stats = getStats();
   return NextResponse.json({ success: true, stats, items });
 }

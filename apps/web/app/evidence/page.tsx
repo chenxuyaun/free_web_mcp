@@ -11,8 +11,16 @@ const statusColor: Record<string, string> = {
   INSUFFICIENT_EVIDENCE: "text-neutral-400 border-neutral-700",
 };
 
-export default function EvidenceListPage() {
-  const items = listEvidence();
+const STATUSES = ["SUPPORTED", "LIKELY_TRUE", "CONTRADICTED", "INSUFFICIENT_EVIDENCE"] as const;
+
+export default function EvidenceListPage({
+  searchParams,
+}: {
+  searchParams?: { status?: string; q?: string };
+}) {
+  const status = searchParams?.status || undefined;
+  const q = searchParams?.q || undefined;
+  const items = listEvidence({ status, q, limit: 100 });
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
@@ -28,6 +36,38 @@ export default function EvidenceListPage() {
           ← Dashboard
         </Link>
       </div>
+
+      <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
+        <input
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Search claims or id…"
+          className="w-64 rounded border border-neutral-700 bg-neutral-950 px-3 py-1.5 text-sm text-neutral-200"
+        />
+        <select
+          name="status"
+          defaultValue={status ?? ""}
+          className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm text-neutral-300"
+        >
+          <option value="">All statuses</option>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="rounded border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800"
+        >
+          Filter
+        </button>
+        {(status || q) && (
+          <Link href="/evidence" className="text-xs text-neutral-500 hover:text-neutral-300">
+            Clear
+          </Link>
+        )}
+      </form>
 
       {items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-neutral-800 p-10 text-center text-neutral-500">

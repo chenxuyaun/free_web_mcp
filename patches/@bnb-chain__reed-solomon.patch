@@ -1,0 +1,39 @@
+diff --git a/package.json b/package.json
+index ae4cb1f791e55205f7b72ff7c7569017f567e5e7..804df2963ea051d1ac8206c01fdd4d92cd1e3627 100644
+--- a/package.json
++++ b/package.json
+@@ -10,26 +10,26 @@
+       "import": "./dist/index.js",
+       "require": "./dist/index.js",
+       "main": "./dist/index.js",
+-      "default": "./dist/index.js",
+-      "types": "./types/index.d.ts"
++      "types": "./types/index.d.ts",
++      "default": "./dist/index.js"
+     },
+     "./node.adapter": {
+-      "default": "./dist/node.adapter.js",
+       "types": "./types/node.adapter.d.ts",
+       "node": "./dist/node.adapter.js",
+-      "require": "./dist/node.adapter.js"
++      "require": "./dist/node.adapter.js",
++      "default": "./dist/node.adapter.js"
+     },
+     "./web.adapter": {
+-      "default": "./dist/web.adapter.js",
+       "types": "./types/web.adapter.d.ts",
+-      "import": "./dist/web.adapter.js"
++      "import": "./dist/web.adapter.js",
++      "default": "./dist/web.adapter.js"
+     },
+     "./utils": {
+       "import": "./dist/utils.esm.js",
+       "require": "./dist/utils.js",
+       "main": "./dist/utils.js",
+-      "default": "./dist/utils.js",
+-      "types": "./types/utils.d.ts"
++      "types": "./types/utils.d.ts",
++      "default": "./dist/utils.js"
+     }
+   },
+   "typesVersions": {

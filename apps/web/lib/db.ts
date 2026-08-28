@@ -158,13 +158,38 @@ export function insertEvidence(input: InsertInput, dbPath?: string): EvidencePac
   return withId;
 }
 
-export function listEvidence(dbPath?: string): EvidenceRowSummary[] {
+export function listEvidence(
+  opts?: { status?: string; q?: string; limit?: number } | string,
+  maybeDbPath?: string,
+): EvidenceRowSummary[] {
+  // Back-compat: first arg may be a dbPath string.
+  let status: string | undefined;
+  let q: string | undefined;
+  let limit: number | undefined;
+  let dbPath: string | undefined = maybeDbPath;
+  if (typeof opts === "string") {
+    dbPath = opts;
+  } else if (opts && typeof opts === "object") {
+    ({ status, q, limit } = opts);
+  }
   const db = getDb(dbPath);
+  const conds: string[] = [];
+  const params: Array<string> = [];
+  if (status) {
+    conds.push("status = ?");
+    params.push(status);
+  }
+  if (q) {
+    conds.push("(claim_text LIKE ? OR id LIKE ?)");
+    params.push(`%${q}%`, `%${q}%`);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  const lim = limit ? `LIMIT ${Number(limit)}` : "";
   const rows = db
     .prepare(
-      "SELECT id, claim_text, claim_type, status, confidence, hash, anchored, created_at FROM evidence ORDER BY created_at DESC",
+      `SELECT id, claim_text, claim_type, status, confidence, hash, anchored, created_at FROM evidence ${where} ORDER BY created_at DESC ${lim}`,
     )
-    .all() as Array<{
+    .all(...params) as Array<{
     id: string;
     claim_text: string;
     claim_type: string;
