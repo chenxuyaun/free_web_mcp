@@ -25,3 +25,4 @@ contracts/broadcast/
 .DS_Store
 Thumbs.db
 apps/web/data/
+.env.local
