@@ -2,10 +2,24 @@
 .venv/
 __pycache__/
 .pytest_cache/
-.ruff_cache/
 .mypy_cache/
 *.pyc
 dist/
 build/
 .zcode/
 .cursor/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# OS
+.DS_Store
+Thumbs.db
