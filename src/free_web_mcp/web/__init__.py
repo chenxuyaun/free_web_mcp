@@ -2,6 +2,7 @@
 
 from free_web_mcp.web.client import WebClient
 from free_web_mcp.web.fetch import FetchService
+from free_web_mcp.web.render import RenderClient
 from free_web_mcp.web.search import SearchService
 
-__all__ = ["FetchService", "SearchService", "WebClient"]
+__all__ = ["FetchService", "RenderClient", "SearchService", "WebClient"]

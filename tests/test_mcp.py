@@ -91,3 +91,43 @@ async def test_search_and_fetch_mixes_ok_and_failures() -> None:
     assert ok_item["fetched"] is not None and ok_item["error"] is None
     assert bad_item["fetched"] is None
     assert bad_item["error"]["type"] == "INVALID_URL"
+
+
+async def test_web_fetch_rendered_routes_to_render_client() -> None:
+    """rendered=True must dispatch through RenderClient, not WebClient."""
+    from free_web_mcp.web.client import PageContent
+    from tests.test_render import FakeRenderClient
+
+    rendered_html = (
+        "<html><head><title>SPA</title></head>"
+        "<body><article><p>Hello from a headless browser.</p></article></body></html>"
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", render_enabled=True))
+    ctx.search.provider = FakeProvider()
+    ctx.fetch.render = FakeRenderClient(
+        page=PageContent(
+            url="https://spa.example.com/",
+            status_code=200,
+            content=rendered_html.encode(),
+            content_type="text/html",
+        )
+    )
+
+    payload = await call_tool(
+        ctx, "web_fetch", {"url": "https://spa.example.com/", "rendered": True}
+    )
+    assert payload["success"] is True
+    assert payload["title"] == "SPA"
+    assert "Hello from a headless browser." in payload["content"]
+    assert ctx.fetch.render.calls == [("https://spa.example.com/", True)]  # type: ignore[attr-defined]
+
+
+async def test_web_fetch_rendered_disabled_returns_error() -> None:
+    ctx = make_ctx(Settings(log_level="ERROR", render_enabled=False))
+    ctx.search.provider = FakeProvider()
+
+    payload = await call_tool(
+        ctx, "web_fetch", {"url": "https://spa.example.com/", "rendered": True}
+    )
+    assert payload["success"] is False
+    assert payload["error"]["type"] == "RENDER_FAILED"

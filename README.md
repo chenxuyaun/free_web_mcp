@@ -9,8 +9,8 @@ Free Web MCP —— 一个免费的 MCP Server，为 Claude / Cursor / 其他 MC
 | Tool | 说明 |
 | --- | --- |
 | `web_search(query, max_results=5)` | DuckDuckGo 搜索，返回 `{title,url,snippet,source}` 列表 |
-| `web_fetch(url)` | 抓取网页并提取正文，返回 `{url,title,content,text_length}` |
-| `web_search_and_fetch(query, max_results=5)` | 搜索后逐个抓取 Top N 结果正文 |
+| `web_fetch(url, rendered=False)` | 抓取网页并提取正文，返回 `{url,title,content,text_length}`；`rendered=True` 时驱动 headless Chromium（需 `RENDER_ENABLED=true`） |
+| `web_search_and_fetch(query, max_results=5, rendered=False)` | 搜索后逐个抓取 Top N 结果正文 |
 
 ## 快速开始
 
@@ -49,8 +49,13 @@ MCP streamable-http 端点：`http://<host>:8000/mcp`。
 ### Docker
 
 ```bash
+# 默认：仅 HTTP 抓取路径
 docker build -f docker/Dockerfile -t free-web-mcp .
 docker run --rm -p 8000:8000 free-web-mcp
+
+# 启用 headless 渲染（构建时下载 Chromium ~150MB；首次启动约 1-3s）
+docker build -f docker/Dockerfile --build-arg INSTALL_PLAYWRIGHT_BROWSERS=true -t free-web-mcp:render .
+docker run --rm -p 8000:8000 -e RENDER_ENABLED=true free-web-mcp:render
 ```
 
 ## 配置（.env）
@@ -64,6 +69,9 @@ docker run --rm -p 8000:8000 free-web-mcp
 | HTTP_TIMEOUT | 30 | 抓取超时（秒） |
 | MAX_CONTENT_LENGTH | 5000000 | 响应体大小上限（字节） |
 | SEARCH_MAX_RESULTS | 10 | max_results 的硬上限 |
+| RENDER_ENABLED | false | 是否启用 headless 浏览器（Playwright + Chromium） |
+| RENDER_TIMEOUT | 30 | 渲染超时（秒） |
+| RENDER_MAX_BYTES | 5000000 | 渲染后响应体大小上限 |
 
 ## 开发
 

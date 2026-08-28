@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     search_max_results: int = 10
 
+    render_enabled: bool = False
+    render_timeout: int = 30
+    render_max_bytes: int = 5_000_000
+
 
 @lru_cache
 def get_settings() -> Settings:

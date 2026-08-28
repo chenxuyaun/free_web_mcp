@@ -6,6 +6,7 @@ from functools import lru_cache
 from free_web_mcp.config import Settings, get_settings
 from free_web_mcp.web.client import WebClient
 from free_web_mcp.web.fetch import FetchService
+from free_web_mcp.web.render import RenderClient
 from free_web_mcp.web.search import SearchService
 
 
@@ -15,19 +16,23 @@ class AppContext:
     client: WebClient
     search: SearchService
     fetch: FetchService
+    render: RenderClient
 
     @classmethod
     def create(cls, settings: Settings | None = None) -> "AppContext":
         s = settings or get_settings()
         client = WebClient(s)
+        render = RenderClient(s)
         return cls(
             settings=s,
             client=client,
             search=SearchService(settings=s),
-            fetch=FetchService(client, s),
+            fetch=FetchService(client, s, render),
+            render=render,
         )
 
     async def aclose(self) -> None:
+        await self.render.aclose()
         await self.client.aclose()
 
 

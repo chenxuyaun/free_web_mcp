@@ -37,23 +37,29 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
             return _error_payload(exc)
 
     @server.tool()
-    async def web_fetch(url: str) -> dict[str, Any]:
-        """Fetch a webpage and extract its main readable content."""
+    async def web_fetch(url: str, rendered: bool = False) -> dict[str, Any]:
+        """Fetch a webpage and extract its main readable content.
+
+        Set rendered=True to drive a headless browser (requires RENDER_ENABLED=true)."""
         try:
-            page = await ctx.fetch.fetch(url)
+            page = await ctx.fetch.fetch(url, rendered=rendered)
             return {"success": True, **page.model_dump(mode="json")}
         except ToolError as exc:
             return _error_payload(exc)
 
     @server.tool()
-    async def web_search_and_fetch(query: str, max_results: int = 5) -> dict[str, Any]:
-        """Search the web, then fetch and extract text from each result URL."""
+    async def web_search_and_fetch(
+        query: str, max_results: int = 5, rendered: bool = False
+    ) -> dict[str, Any]:
+        """Search the web, then fetch and extract text from each result URL.
+
+        Set rendered=True to drive a headless browser (requires RENDER_ENABLED=true)."""
         try:
             search_response = await ctx.search.search(query, max_results)
             items: list[SearchPageItem] = []
             for result in search_response.results:
                 try:
-                    page = await ctx.fetch.fetch(result.url)
+                    page = await ctx.fetch.fetch(result.url, rendered=rendered)
                     items.append(SearchPageItem(search=result, fetched=page))
                 except ToolError as exc:
                     items.append(
