@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRegistryClient } from "@/lib/blockchain";
-import { getEvidenceHash, getEvidencePackage, markAnchored } from "@/lib/db";
+import { getEvidenceHash, getEvidencePackage, getGreenfieldUri, markAnchored } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +78,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const version = pkg.provenance.engineVersion;
-  const uri = `free-web-mcp://evidence/${params.id}`;
+  // Prefer the decentralized Greenfield URI when the package was published
+  // (Phase G); fall back to the app-scheme URI otherwise.
+  const uri = getGreenfieldUri(params.id) ?? `free-web-mcp://evidence/${params.id}`;
 
   try {
     const result = await client.anchorEvidence(`0x${evidenceHash}`, uri, version);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AnchorButton } from "@/components/AnchorButton";
+import { PublishButton } from "@/components/PublishButton";
 import { CopyButton } from "@/components/CopyButton";
 import { Timeline } from "@/components/Timeline";
 import { ValidatorPanel } from "@/components/ValidatorPanel";
@@ -166,6 +167,10 @@ export default async function EvidenceDetailPage({
 
       <Section title="Timeline">
         <Timeline id={pkg.id} />
+      </Section>
+
+      <Section title="Decentralized Storage (Greenfield, spec §27)">
+        <PublishButton id={pkg.id} publishedUri={pkg.storage?.uri ?? null} />
       </Section>
 
       <Section title="Blockchain">

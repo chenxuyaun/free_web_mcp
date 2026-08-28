@@ -82,4 +82,9 @@ export interface EvidencePackage {
     evidenceHash?: string;
     uri?: string;
   } | null;
+  /** Decentralized storage pointer (Phase G, spec §27). */
+  storage?: {
+    uri: string;
+    kind: string; // "greenfield"
+  };
 }

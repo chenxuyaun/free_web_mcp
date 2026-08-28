@@ -13,6 +13,7 @@
   "dependencies": {
     "@free-web-mcp/blockchain": "workspace:*",
     "@free-web-mcp/evidence": "workspace:*",
+    "@free-web-mcp/storage": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "lucide-react": "0.460.0",
     "next": "14.2.18",

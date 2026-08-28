@@ -97,6 +97,11 @@ export function ensureSchema(db: Db): void {
   if (!voteCols.includes("challenge_of")) {
     db.exec("ALTER TABLE votes ADD COLUMN challenge_of TEXT");
   }
+  // Migration: evidence rows predate greenfieldUri (Phase G decentralized storage).
+  const evCols = (db.pragma("table_info(evidence)") as Array<{ name: string }>).map((c) => c.name);
+  if (!evCols.includes("greenfield_uri")) {
+    db.exec("ALTER TABLE evidence ADD COLUMN greenfield_uri TEXT");
+  }
 }
 
 export function closeDb(dbPath?: string): void {
@@ -209,6 +214,29 @@ export function markAnchored(
     .prepare("UPDATE evidence SET anchored = 1, package_json = ? WHERE id = ?")
     .run(JSON.stringify(pkg), id);
   return res.changes > 0;
+}
+
+/** Store the Greenfield URI for an evidence record after publishing (Phase G). */
+export function markPublished(id: string, greenfieldUri: string, dbPath?: string): boolean {
+  const db = getDb(dbPath);
+  const row = db.prepare("SELECT package_json FROM evidence WHERE id = ?").get(id) as
+    | { package_json: string }
+    | undefined;
+  if (!row) return false;
+  const pkg = JSON.parse(row.package_json) as EvidencePackage;
+  pkg.storage = { uri: greenfieldUri, kind: "greenfield" };
+  const res = db
+    .prepare("UPDATE evidence SET greenfield_uri = ?, package_json = ? WHERE id = ?")
+    .run(greenfieldUri, JSON.stringify(pkg), id);
+  return res.changes > 0;
+}
+
+export function getGreenfieldUri(id: string, dbPath?: string): string | null {
+  const db = getDb(dbPath);
+  const row = db.prepare("SELECT greenfield_uri FROM evidence WHERE id = ?").get(id) as
+    | { greenfield_uri: string | null }
+    | undefined;
+  return row?.greenfield_uri ?? null;
 }
 
 export function getStats(dbPath?: string): EvidenceStats {
