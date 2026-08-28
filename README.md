@@ -1,98 +1,184 @@
-# free_web_mcp
+# free-web-mcp
 
-Free Web MCP —— 一个免费的 MCP Server，为 Claude / Cursor / 其他 MCP Client 提供网络搜索（DuckDuckGo，无需 API Key）与网页抓取 + 正文提取工具。
+> A free, open-source MCP server that gives any AI agent (Claude, Cursor, ChatGPT Connectors, …) web search + web fetch + content extraction + a one-call "search-and-fetch" combo + a link-source classifier — all through the standard [Model Context Protocol](https://modelcontextprotocol.io/) over Streamable HTTP.
 
-详细需求见 [docs/free_web_mcp.md](docs/free_web_mcp.md)。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
+[![MCP 2025-06-18](https://img.shields.io/badge/MCP-2025--06--18-purple.svg)](https://modelcontextprotocol.io/)
+[![CI](https://github.com/chenxuyaun/free_web_mcp/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 
-## Tools
+**Live demo (ngrok fallback)**: <https://mononuclear-polytonally-clifton.ngrok-free.dev>
+**For a permanent URL**, follow [Render deployment](docs/deploy_live_url.md#path-a-render-permanent).
 
-| Tool | 说明 |
-| --- | --- |
-| `web_search(query, max_results=5)` | DuckDuckGo 搜索，返回 `{title,url,snippet,source,source_domain,confidence}` |
-| `web_fetch(url, rendered=False)` | 抓取网页并提取正文，返回 `{url,title,content,text_length,meta}`；`rendered=True` 时驱动 headless Chromium（需 `RENDER_ENABLED=true`） |
-| `web_search_and_fetch(query, max_results=5, rendered=False)` | 搜索后逐个抓取 Top N 结果正文 |
-| `web_summarize_with_sources(url=None, html=None, max_links=25)` | 抽取作者 / 引用 / 链接；按 **一手 / 二手 / 三手** 分类，让 AI 自主判断可信度 |
+---
 
-## 快速开始
+## How judges can connect
 
-```bash
-uv sync
-```
+This is a **standard MCP server** (Streamable HTTP transport). It is **not** auto-discovered by Chrome's WebMCP origin trial — that spec only sees tools registered via `document.modelContext.registerTool()` on the currently loaded page, and explicit remote-MCP discovery is out of scope in the 2025-06-18 spec. **To use it, paste the URL into a real MCP client** — three options below.
 
-### stdio 模式（本地客户端）
+### ChatGPT (web / Atlas in-app browser)
 
-```bash
-uv run free-web-mcp                # 或: uv run python -m free_web_mcp
-```
+Settings → Connectors → Add → URL: `https://<your-live-url>/mcp`
 
-Cursor / Claude Desktop 配置示例：
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "free-web-mcp": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/free_web_mcp", "free-web-mcp"]
+      "url": "https://<your-live-url>/mcp"
     }
   }
 }
 ```
 
-### HTTP 模式（远程部署）
+### Cursor
 
-```bash
-uv run free-web-mcp --transport http   # 监听 .env 中的 HOST/PORT，默认 0.0.0.0:8000
-curl http://localhost:8000/health      # -> {"status":"ok","service":"free-web-mcp"}
+Add to `.cursor/mcp.json` (project or `~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "free-web-mcp": {
+      "url": "https://<your-live-url>/mcp"
+    }
+  }
+}
 ```
 
-MCP streamable-http 端点：`http://<host>:8000/mcp`。
+### Quick sanity check
 
-### 公开 Live URL（给评委 / 远程用户）
+```bash
+curl https://<your-live-url>/health
+# {"status":"ok","service":"free-web-mcp","version":"0.1.0"}
 
-两种方式，详见 [`docs/deploy_live_url.md`](docs/deploy_live_url.md)：
-
-- **Render（永久）**：`render.yaml` 已配好，导入 Render Blueprint 即可
-- **ngrok（即时）**：`ngrok http 8000` 立刻出一个 `https://*.ngrok-free.app`
-
-测活：`uv run python scripts/e2e_http_check.py https://<your-url>`
+# MCP initialize
+curl -X POST https://<your-live-url>/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"judge","version":"0"}}}'
+```
 
 ---
 
-### Docker
+## Tools
 
-```bash
-# 默认：仅 HTTP 抓取路径
-docker build -f docker/Dockerfile -t free-web-mcp .
-docker run --rm -p 8000:8000 free-web-mcp
-
-# 启用 headless 渲染（构建时下载 Chromium ~150MB；首次启动约 1-3s）
-docker build -f docker/Dockerfile --build-arg INSTALL_PLAYWRIGHT_BROWSERS=true -t free-web-mcp:render .
-docker run --rm -p 8000:8000 -e RENDER_ENABLED=true free-web-mcp:render
-```
-
-## 配置（.env）
-
-复制 `.env.example` 为 `.env` 后按需修改；`.env` 不入库。
-
-| 变量 | 默认 | 说明 |
+| Tool | Description | Inputs |
 | --- | --- | --- |
-| HOST / PORT | 0.0.0.0 / 8000 | HTTP 监听地址 |
-| LOG_LEVEL | INFO | 日志级别 |
-| HTTP_TIMEOUT | 30 | 抓取超时（秒） |
-| MAX_CONTENT_LENGTH | 5000000 | 响应体大小上限（字节） |
-| SEARCH_MAX_RESULTS | 10 | max_results 的硬上限 |
-| RENDER_ENABLED | false | 是否启用 headless 浏览器（Playwright + Chromium） |
-| RENDER_TIMEOUT | 30 | 渲染超时（秒） |
-| RENDER_MAX_BYTES | 5000000 | 渲染后响应体大小上限 |
+| `web_search` | Search the web (DuckDuckGo, no API key). Each result carries `source_domain` and a `confidence` score (0-1). | `query: str`, `max_results: int = 5` (1-10) |
+| `web_fetch` | Fetch a URL and extract its main readable content. Returns a `meta` block with `domain_type`, `https`, `published_at`, `fetched_at`, `author`, `content_length_raw`. | `url: str`, `rendered: bool = False` |
+| `web_search_and_fetch` | Search the web, then fetch + extract Top-N URLs in one call. | `query: str`, `max_results: int = 5` (1-10), `rendered: bool = False` |
+| `web_summarize_with_sources` | Extract authors / citations / links from a page and classify each link as **primary** (same domain) / **secondary** (gov / edu / academic) / **tertiary** (aggregator / social). | `url: str \| None`, `html: str \| None`, `max_links: int = 25` |
 
-## 开发
+All four tools return `{success: true, ...}` on success and `{success: false, error: {type, message}}` on failure. The `type` field is one of: `INVALID_URL`, `FETCH_FAILED`, `TIMEOUT`, `HTTP_ERROR`, `PARSER_ERROR`, `SEARCH_FAILED`, `RATE_LIMITED`, `CONTENT_TOO_LARGE`, `RENDER_FAILED`, `RENDER_TIMEOUT`, `INTERNAL_ERROR`.
+
+For JSON schemas of each tool's inputs, see [docs/tools.md](docs/tools.md) or `GET /.well-known/mcp.json` on a running instance.
+
+---
+
+## Quick start
 
 ```bash
-uv run pytest                  # 测试
-uv run ruff check .            # lint
-uv run mypy                    # 类型检查（strict）
+git clone https://github.com/chenxuyaun/free_web_mcp.git
+cd free_web_mcp
+uv sync
+uv run free-web-mcp                                # stdio mode — for Cursor/Claude Desktop
+# or
+uv run free-web-mcp --transport http --port 8000   # http mode — for ChatGPT / web clients
 ```
 
-## 架构
+That's it. No API keys. DuckDuckGo works out of the box. Optional `.env` settings (see [`.env.example`](.env.example)):
 
-严格分层：MCP Tool 层 → Service 层（SearchService/FetchService）→ Provider/HTTP 层。搜索源可插拔（当前实现：`DuckDuckGoProvider`），HTTP 统一走 `WebClient`，正文提取 trafilatura 优先、BeautifulSoup 兜底。详见 AGENTS.md。
+| Var | Default | What it does |
+| --- | --- | --- |
+| `LOG_LEVEL` | `INFO` | Python logging level |
+| `HTTP_TIMEOUT` | `30` | Fetch timeout (s) |
+| `MAX_CONTENT_LENGTH` | `5000000` | Max response body (bytes) |
+| `SEARCH_MAX_RESULTS` | `10` | Hard cap on `max_results` |
+| `RENDER_ENABLED` | `false` | Enable Playwright JS-rendered fetch (needs Chromium; ~150MB image if you also `playwright install chromium`) |
+
+---
+
+## Architecture
+
+```
+MCP Client (Claude / Cursor / ChatGPT / Inspector)
+        |  Streamable HTTP
+        v
++--------------------------------------+
+|  free-web-mcp                        |
+|  +-------------------------+         |
+|  | MCP Tool Layer          |  <- only this layer is exposed to MCP
+|  |  web_search             |  |     (4 tools, all return typed JSON)
+|  |  web_fetch              |  |
+|  |  web_search_and_fetch   |  |
+|  |  web_summarize_with_sources |
+|  +-----------+-------------+         |
+|              v                       |
+|  +-------------------------+         |
+|  | Service Layer           |  |  SearchService / FetchService
+|  +-----------+-------------+  |  (orchestrate providers + parser)
+|              v                       |
+|  +-------------------------+         |
+|  | Provider Layer          |  |  DuckDuckGo (default, no API key)
+|  |                         |  |  WebClient (unified HTTP)
+|  |                         |  |  trafilatura + BeautifulSoup
+|  |                         |  |  Playwright (optional, JS render)
+|  +-------------------------+         |
++--------------------------------------+
+```
+
+Strict layering: MCP tools **never** issue HTTP or parse HTML directly — every request goes through `WebClient`, every search through a `SearchProvider`, every parse through `parser.extract_*`. Swap in a new search engine by adding a provider; MCP tools do not change.
+
+See [docs/free_web_mcp.md](docs/free_web_mcp.md) for the full design doc.
+
+---
+
+## Tested with
+
+- **Cursor** (MCP via stdio and via the public HTTP URL) — all 4 tools exercised end-to-end against real DuckDuckGo + Wikipedia.
+- **Claude Desktop** — same `claude_desktop_config.json` block above, MCP 2025-06-18 transport.
+- **Built-in Python MCP test harness** (`mcp.shared.memory.create_connected_server_and_client_session`) — `tests/test_mcp.py` covers tool registration, return shapes, error wrapping, and the rendered / disabled paths without network.
+- **`scripts/e2e_stdio_check.py`** — stdio e2e, spawns the server, calls every tool, asserts on real DuckDuckGo and Wikipedia responses.
+- **`scripts/e2e_http_check.py`** — Streamable HTTP e2e against the live ngrok URL.
+
+> **Not yet exercised in this submission**: ChatGPT Connectors UI (the protocol is the same MCP 2025-06-18 it expects; add the URL via Settings → Connectors and the assistant can call the tools); Chrome with WebMCP enabled (the server can be wired into a WebMCP page via `examples/webmcp_demo.html`).
+
+---
+
+## Built with
+
+- **Primary AI tool**: [ZCode](https://zcode.io) (agent runtime on the `MiniMax-M3` model). ZCode wrote 9 of 10 commits in this repo — scaffolding, models, web layer, MCP layer, all 39 tests, deployment configs, the v1->v2->v3 feature split, and the `Host` header / 421 debugging that turned the ngrok URL green.
+- **No other AI tools were used** in this project (no Cursor Composer, no Copilot Chat, no Claude.ai, no ChatGPT web).
+- **Doc research** was done inside the same ZCode session using WebFetch against MCP, WebMCP, Cloudflare, and Render docs.
+- **Design decisions** (which tools to ship, error code taxonomy, v1->v3 scope, the MCP-not-WebMCP framing) were made by the human author and reviewed against every ZCode-produced diff before commit.
+- See [docs/AI_TOOLS_USED.md](docs/AI_TOOLS_USED.md) for the full breakdown.
+
+---
+
+## Deployment
+
+- **Render (permanent)**: `render.yaml` is included — one-click Blueprint import. See [docs/deploy_live_url.md](docs/deploy_live_url.md).
+- **ngrok (instant)**: `ngrok http 8000` while `free-web-mcp --transport http` is running. Used for the current live URL above.
+- **Docker**: `docker build -f docker/Dockerfile -t free-web-mcp .` then `docker run --rm -p 8000:8000 free-web-mcp`. To enable `rendered=true` paths, build with `--build-arg INSTALL_PLAYWRIGHT_BROWSERS=true`.
+
+---
+
+## Development
+
+```bash
+uv sync
+uv run pytest                # 39 tests, no real network needed
+uv run ruff check .          # lint
+uv run mypy                  # type check (strict)
+```
+
+CI runs the same three commands on every push — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).

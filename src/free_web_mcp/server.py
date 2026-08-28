@@ -4,9 +4,14 @@ from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
+from free_web_mcp import __version__
 from free_web_mcp.deps import AppContext, get_context
+from free_web_mcp.logging import get_logger
 from free_web_mcp.mcp.server import create_mcp_server
+
+logger = get_logger(__name__)
 
 
 def create_app(ctx: AppContext | None = None) -> FastAPI:
@@ -29,7 +34,40 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "service": ctx.settings.app_name}
+        return {"status": "ok", "service": ctx.settings.app_name, "version": __version__}
+
+    @app.get("/.well-known/mcp.json")
+    def well_known() -> JSONResponse:
+        """Lightweight discoverability document.
+
+        The MCP 2025-06-18 spec does not mandate this file, but it is the
+        de-facto convention for remote MCP servers and what top entries
+        in the MCP ecosystem (Sentry, Cloudflare, Linear) publish.
+        """
+        return JSONResponse(
+            {
+                "name": ctx.settings.app_name,
+                "version": __version__,
+                "transport": "streamable-http",
+                "endpoint": "/mcp",
+                "health": "/health",
+                "protocol_version": "2025-06-18",
+                "tools": [
+                    {
+                        "name": t.name,
+                        "title": t.title,
+                        "description": t.description,
+                        "inputSchema": t.parameters,
+                        "annotations": (
+                            t.annotations.model_dump(exclude_none=True)
+                            if t.annotations is not None
+                            else None
+                        ),
+                    }
+                    for t in mcp_server._tool_manager.list_tools()
+                ],
+            }
+        )
 
     app.mount("/", mcp_app)
     return app

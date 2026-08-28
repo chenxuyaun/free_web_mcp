@@ -1,10 +1,12 @@
 """MCP tool registrations - tools only call the service layer."""
 
 import json
-from typing import Any
+from typing import Annotated, Any
 
 from bs4 import BeautifulSoup
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from free_web_mcp.deps import AppContext
 from free_web_mcp.errors import ErrorCode, ToolError, ToolErrorPayload
@@ -35,6 +37,14 @@ _TERTIARY_DOMAIN_HINTS = (
     "weibo.com",
 )
 _AUTHORITATIVE_TLDS = (".gov", ".edu", ".int", ".mil", ".ac.")
+
+
+# Tool-level annotation presets. readOnlyHint=True because none of these
+# mutate server state; openWorldHint=True because every tool hits the
+# public internet; destructiveHint=False for the same reason.
+READ_OPEN = ToolAnnotations(
+    readOnlyHint=True, openWorldHint=True, destructiveHint=False
+)
 
 
 def _error_payload(exc: Exception) -> dict[str, Any]:
@@ -72,7 +82,6 @@ def _summarize_sources(html: str, base_url: str) -> SourceSummary:
         base_host = base_host[4:]
 
     authors: list[str] = []
-    citations: list[str] = []
 
     # Authors: meta tags first, then JSON-LD.
     for key in ("author", "DC.creator", "article:author", "twitter:creator"):
@@ -96,6 +105,7 @@ def _summarize_sources(html: str, base_url: str) -> SourceSummary:
                 if isinstance(name_value, str) and name_value and name_value not in authors:
                     authors.append(name_value)
 
+    citations: list[str] = []
     # Citations: <cite> + <blockquote cite="..."> + <q cite="...">
     for tag in soup.find_all(["cite", "blockquote", "q"]):
         cite_attr = tag.get("cite")
@@ -107,7 +117,6 @@ def _summarize_sources(html: str, base_url: str) -> SourceSummary:
         if text and tag.name == "cite" and text not in citations:
             citations.append(text[:500])
 
-    # Links.
     seen: set[str] = set()
     links: list[SourceLink] = []
     for a in soup.find_all("a", href=True):
@@ -157,9 +166,29 @@ def _walk_jsonld(node: object, key: str) -> list[object]:
 
 
 def register_tools(server: FastMCP, ctx: AppContext) -> None:
-    @server.tool()
-    async def web_search(query: str, max_results: int = 5) -> dict[str, Any]:
-        """Search the web and return a list of results (title/url/snippet)."""
+    @server.tool(
+        name="web_search",
+        title="Web Search",
+        description=(
+            "Search the web via DuckDuckGo (no API key required) and return a list of "
+            "results. Each result carries a `source_domain` (e.g. `wikipedia.org`) and "
+            "a `confidence` score in 0-1 reflecting ranking and authority hints "
+            "(.gov / .edu / .int / .mil and a small allow-list of well-known domains). "
+            "Use this when you need a quick list of sources for a query."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def web_search(
+        query: Annotated[str, Field(description="The search query string.")],
+        max_results: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=10,
+                description="Maximum number of results to return (1-10).",
+            ),
+        ] = 5,
+    ) -> dict[str, Any]:
         try:
             response: SearchResponse = await ctx.search.search(query, max_results)
             return {
@@ -170,24 +199,66 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
         except ToolError as exc:
             return _error_payload(exc)
 
-    @server.tool()
-    async def web_fetch(url: str, rendered: bool = False) -> dict[str, Any]:
-        """Fetch a webpage and extract its main readable content.
-
-        Set rendered=True to drive a headless browser (requires RENDER_ENABLED=true)."""
+    @server.tool(
+        name="web_fetch",
+        title="Web Fetch",
+        description=(
+            "Fetch a webpage and extract its main readable content (trafilatura first, "
+            "BeautifulSoup as fallback; script / style / nav / footer / ads stripped). "
+            "Returns a `meta` block: `domain_type` (government / academic / news / docs / "
+            "wiki / forum / blog / other), `https` (bool), `published_at` (ISO-8601 if a "
+            "date was found in <meta> or JSON-LD, else null), `fetched_at` (ISO-8601), "
+            "`author` (from <meta name='author'> or JSON-LD, else null), "
+            "`content_length_raw` (raw HTTP body bytes). Set `rendered=true` to drive a "
+            "headless Chromium (requires RENDER_ENABLED=true) for JS-heavy pages."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def web_fetch(
+        url: Annotated[
+            str,
+            Field(description="Absolute http:// or https:// URL to fetch."),
+        ],
+        rendered: Annotated[
+            bool,
+            Field(
+                description="Drive a headless browser (requires RENDER_ENABLED=true).",
+            ),
+        ] = False,
+    ) -> dict[str, Any]:
         try:
             page = await ctx.fetch.fetch(url, rendered=rendered)
             return {"success": True, **page.model_dump(mode="json")}
         except ToolError as exc:
             return _error_payload(exc)
 
-    @server.tool()
+    @server.tool(
+        name="web_search_and_fetch",
+        title="Search and Fetch",
+        description=(
+            "Combine web_search + web_fetch: search the web, then fetch and extract the "
+            "main text of the Top-N result URLs in one round-trip. Per-item failures do "
+            "not abort the batch; each item carries either `fetched` or `error`."
+        ),
+        annotations=READ_OPEN,
+    )
     async def web_search_and_fetch(
-        query: str, max_results: int = 5, rendered: bool = False
+        query: Annotated[str, Field(description="The search query string.")],
+        max_results: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=10,
+                description="Maximum number of results to fetch (1-10).",
+            ),
+        ] = 5,
+        rendered: Annotated[
+            bool,
+            Field(
+                description="Drive a headless browser for each fetch (RENDER_ENABLED=true).",
+            ),
+        ] = False,
     ) -> dict[str, Any]:
-        """Search the web, then fetch and extract text from each result URL.
-
-        Set rendered=True to drive a headless browser (requires RENDER_ENABLED=true)."""
         try:
             search_response = await ctx.search.search(query, max_results)
             items: list[SearchPageItem] = []
@@ -207,15 +278,39 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
         except ToolError as exc:
             return _error_payload(exc)
 
-    @server.tool()
+    @server.tool(
+        name="web_summarize_with_sources",
+        title="Summarize with Source Classification",
+        description=(
+            "Given a page (URL or inline HTML), extract authors, citations, and every "
+            "outgoing link, and classify each link as `primary` (same domain), "
+            "`secondary` (.gov / .edu / .int / .mil / .ac. and academic publishers), or "
+            "`tertiary` (social / aggregator: reddit, stackoverflow, medium, twitter, "
+            "weibo, etc.). The `counts` field is the per-tier totals so the agent can "
+            "weight citations without reading every link."
+        ),
+        annotations=READ_OPEN,
+    )
     async def web_summarize_with_sources(
-        url: str | None = None,
-        html: str | None = None,
-        max_links: int = 25,
+        url: Annotated[
+            str | None,
+            Field(
+                description="Absolute URL to fetch. Provide either `url` or `html`, not both.",
+            ),
+        ] = None,
+        html: Annotated[
+            str | None,
+            Field(description="Inline HTML to summarize. Provide either `url` or `html`."),
+        ] = None,
+        max_links: Annotated[
+            int,
+            Field(
+                ge=1,
+                le=200,
+                description="Maximum number of link entries to return (1-200).",
+            ),
+        ] = 25,
     ) -> dict[str, Any]:
-        """Extract authors, citations and links from a page; classify each link
-        as primary (same domain), secondary (gov/edu/int), or tertiary
-        (aggregator / social). The agent decides what to trust."""
         try:
             if url is None and html is None:
                 raise ToolError(ErrorCode.INVALID_URL, "Provide either url or html.")
