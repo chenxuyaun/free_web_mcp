@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     render_timeout: int = 30
     render_max_bytes: int = 5_000_000
 
+    # Evidence API (the Next.js dashboard owns evidence persistence)
+    evidence_api_url: str = "http://127.0.0.1:3000"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -10,6 +10,11 @@ from pydantic import Field
 
 from free_web_mcp.deps import AppContext
 from free_web_mcp.errors import ErrorCode, ToolError, ToolErrorPayload
+from free_web_mcp.evidence import (
+    EvidenceApiClient,
+    counter_evidence_searches,
+    extract_claims,
+)
 from free_web_mcp.logging import get_logger
 from free_web_mcp.models.page import (
     SearchAndFetchResponse,
@@ -325,5 +330,117 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
             summary = _summarize_sources(source_html, source_url)
             summary.links = summary.links[: max(1, max_links)]
             return {"success": True, **summary.model_dump(mode="json")}
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="extract_claims",
+        title="Extract Claims",
+        description=(
+            "Split a block of text into individual claims and classify each as fact / "
+            "event / number / date / relationship / opinion / inference. Deterministic "
+            "rule-based extraction — no LLM. Use it to pick which claim to verify next."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def extract_claims(
+        text: Annotated[
+            str,
+            Field(description="The text to split into claims (any length)."),
+        ],
+    ) -> dict[str, Any]:
+        try:
+            claims = extract_claims(text)
+            return {
+                "success": True,
+                "count": len(claims),
+                "claims": [
+                    {"id": c.id, "text": c.text, "type": c.type} for c in claims
+                ],
+            }
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="find_counter_evidence",
+        title="Find Counter Evidence",
+        description=(
+            "Generate counter-evidence search directions for a claim (fact-check, "
+            "debunk, correction angles). Returns the searches to run with web_search — "
+            "run them and pass contradicting results to create_evidence_record."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def find_counter_evidence(
+        claim: Annotated[str, Field(description="The claim to challenge.")],
+    ) -> dict[str, Any]:
+        try:
+            searches = counter_evidence_searches(claim)
+            return {"success": True, "claim": claim, "searches": searches}
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="create_evidence_record",
+        title="Create Evidence Record",
+        description=(
+            "Build a verified evidence package from a claim plus its supporting / "
+            "contradicting sources. The server computes the verification status, "
+            "canonicalizes the package, and returns its SHA-256 hash. Requires the "
+            "evidence API (dashboard) to be running."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def create_evidence_record(
+        claim: Annotated[str, Field(description="The claim being verified.")],
+        supporting: Annotated[
+            list[dict[str, str]],
+            Field(
+                description=(
+                    "Sources that support the claim. Each: {url, title, source_type, "
+                    "published_at?, retrieved_at?, content_hash?}. source_type is one of "
+                    "official/primary/major_media/professional/secondary/unknown/social."
+                )
+            ),
+        ],
+        contradicting: Annotated[
+            list[dict[str, str]],
+            Field(description="Sources that contradict the claim (same shape as supporting)."),
+        ] = [],
+        cross_verified: Annotated[
+            bool, Field(description="Whether an independent cross-check was performed.")
+        ] = False,
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            result = client.create_evidence_record(
+                claim=claim,
+                claim_type="fact",
+                supporting=supporting,
+                contradicting=contradicting,
+                counter_searches=counter_evidence_searches(claim),
+                cross_verified=cross_verified,
+            )
+            return result
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="get_evidence",
+        title="Get Evidence Record",
+        description=(
+            "Fetch a previously created evidence package by id (EV-XXXXXX), including "
+            "its verification status, sources, and SHA-256 hash."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def get_evidence(
+        evidence_id: Annotated[
+            str, Field(description="Evidence id in the form EV-XXXXXX.")
+        ],
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.get_evidence(evidence_id)
         except ToolError as exc:
             return _error_payload(exc)
