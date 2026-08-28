@@ -68,3 +68,28 @@ async def test_fetch_service_extracts_page(settings) -> None:
     assert fetched.title == "Doc"
     assert "Hello fetchable world." in fetched.content
     assert fetched.text_length == len(fetched.content)
+
+
+async def test_ssrf_rejects_private_ip_and_localhost(settings) -> None:
+    client = WebClient(settings)
+    for bad in (
+        "http://127.0.0.1/secret",
+        "http://localhost/secret",
+        "http://169.254.169.254/latest/meta-data",
+        "http://10.0.0.1/x",
+        "http://192.168.1.1/x",
+        "http://0.0.0.0/x",
+    ):
+        with pytest.raises(ToolError) as excinfo:
+            await client.get(bad)
+        assert excinfo.value.code == "INVALID_URL", bad
+        assert "Private or local" in excinfo.value.message, bad
+
+
+async def test_ssrf_allows_public_ip(settings) -> None:
+    client = WebClient(settings)
+    # 8.8.8.8 is public; we don't actually fetch it here (no respx route),
+    # we only assert the URL passes the SSRF gate and reaches HTTP layer.
+    with pytest.raises(ToolError) as excinfo:
+        await client.get("http://8.8.8.8/")
+    assert excinfo.value.code != "INVALID_URL"

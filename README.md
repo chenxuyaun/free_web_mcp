@@ -1,183 +1,204 @@
-# free-web-mcp
+# Free Web MCP — Verifiable Web Evidence Network
 
-> A free, open-source MCP server that gives any AI agent (Claude, Cursor, ChatGPT Connectors, …) web search + web fetch + content extraction + a one-call "search-and-fetch" combo + a link-source classifier — all through the standard [Model Context Protocol](https://modelcontextprotocol.io/) over Streamable HTTP.
+> Give AI agents free web access, **verify the evidence behind web-derived
+> claims**, and **anchor evidence fingerprints on BNB Smart Chain (Testnet)**.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
-[![MCP 2025-06-18](https://img.shields.io/badge/MCP-2025--06--18-purple.svg)](https://modelcontextprotocol.io/)
-[![CI](https://github.com/chenxuyaun/free_web_mcp/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+```
+AI Agent → MCP → Web Search → Web Fetch → Claim Extraction → Evidence Collection
+  → Cross Verification → Counter Evidence → Evidence Package → SHA-256
+  → BSC Testnet (EvidenceRegistry) → Dashboard
+```
 
-**Live demo (ngrok fallback)**: <https://mononuclear-polytonally-clifton.ngrok-free.dev>
-**For a permanent URL**, follow [Render deployment](docs/deploy_live_url.md#path-a-render-permanent).
+**Live demo** (local): `pnpm dev` → http://localhost:3000
 
 ---
 
-## How judges can connect
+## What this project is
 
-This is a **standard MCP server** (Streamable HTTP transport). It is **not** auto-discovered by Chrome's WebMCP origin trial — that spec only sees tools registered via `document.modelContext.registerTool()` on the currently loaded page, and explicit remote-MCP discovery is out of scope in the 2025-06-18 spec. **To use it, paste the URL into a real MCP client** — three options below.
+A monorepo with two halves:
 
-### ChatGPT (web / Atlas in-app browser)
-
-Settings → Connectors → Add → URL: `https://<your-live-url>/mcp`
-
-### Claude Desktop
-
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "free-web-mcp": {
-      "url": "https://<your-live-url>/mcp"
-    }
-  }
-}
-```
-
-### Cursor
-
-Add to `.cursor/mcp.json` (project or `~/.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "free-web-mcp": {
-      "url": "https://<your-live-url>/mcp"
-    }
-  }
-}
-```
-
-### Quick sanity check
-
-```bash
-curl https://<your-live-url>/health
-# {"status":"ok","service":"free-web-mcp","version":"0.1.0"}
-
-# MCP initialize
-curl -X POST https://<your-live-url>/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"judge","version":"0"}}}'
-```
-
----
-
-## Tools
-
-| Tool | Description | Inputs |
+| Half | What | Stack |
 | --- | --- | --- |
-| `web_search` | Search the web (DuckDuckGo, no API key). Each result carries `source_domain` and a `confidence` score (0-1). | `query: str`, `max_results: int = 5` (1-10) |
-| `web_fetch` | Fetch a URL and extract its main readable content. Returns a `meta` block with `domain_type`, `https`, `published_at`, `fetched_at`, `author`, `content_length_raw`. | `url: str`, `rendered: bool = False` |
-| `web_search_and_fetch` | Search the web, then fetch + extract Top-N URLs in one call. | `query: str`, `max_results: int = 5` (1-10), `rendered: bool = False` |
-| `web_summarize_with_sources` | Extract authors / citations / links from a page and classify each link as **primary** (same domain) / **secondary** (gov / edu / academic) / **tertiary** (aggregator / social). | `url: str \| None`, `html: str \| None`, `max_links: int = 25` |
+| **Web evidence pipeline** | claim extraction, source scoring, verification, counter-evidence directions, canonical SHA-256 hashing | Node 22 / TypeScript / pnpm |
+| **Dashboard + API** | live status board, evidence list/detail, statistics, one-click demo, **Anchor Evidence** (writes the hash on-chain) | Next.js 14 / React / Tailwind / better-sqlite3 |
+| **MCP server** | the 8-tool MCP server (`web_search`, `web_fetch`, `web_search_and_fetch`, `web_summarize_with_sources`, `extract_claims`, `find_counter_evidence`, `create_evidence_record`, `get_evidence`) | Python 3.12 / FastMCP / DuckDuckGo |
+| **Smart contract** | `EvidenceRegistry` — register / lookup / de-duplicate evidence fingerprints | Solidity 0.8.24 / Foundry / viem |
 
-All four tools return `{success: true, ...}` on success and `{success: false, error: {type, message}}` on failure. The `type` field is one of: `INVALID_URL`, `FETCH_FAILED`, `TIMEOUT`, `HTTP_ERROR`, `PARSER_ERROR`, `SEARCH_FAILED`, `RATE_LIMITED`, `CONTENT_TOO_LARGE`, `RENDER_FAILED`, `RENDER_TIMEOUT`, `INTERNAL_ERROR`.
+All evidence packages are **persisted in SQLite** (`apps/web/data/evidence.db`) and
+can be **anchored on-chain** — the on-chain record stores only the SHA-256 hash
++ URI + version + submitter + timestamp, never the full content.
 
-For JSON schemas of each tool's inputs, see [docs/tools.md](docs/tools.md) or `GET /.well-known/mcp.json` on a running instance.
+## Milestones (computed live on the dashboard)
+
+MCP Server · Web Search · Web Fetch · Evidence Engine · First Evidence ·
+Blockchain Registry · First On-chain Record · Dashboard · Validator ·
+VERI Test Token
 
 ---
 
 ## Quick start
 
+### 1. Install
+
 ```bash
-git clone https://github.com/chenxuyaun/free_web_mcp.git
-cd free_web_mcp
-uv sync
-uv run free-web-mcp                                # stdio mode — for Cursor/Claude Desktop
-# or
-uv run free-web-mcp --transport http --port 8000   # http mode — for ChatGPT / web clients
+# Node side
+pnpm install
+
+# Python side (MCP server)
+cd apps/mcp-server && uv sync && cd ../..
 ```
 
-That's it. No API keys. DuckDuckGo works out of the box. Optional `.env` settings (see [`.env.example`](.env.example)):
+### 2. Run everything (3 terminals)
 
-| Var | Default | What it does |
-| --- | --- | --- |
-| `LOG_LEVEL` | `INFO` | Python logging level |
-| `HTTP_TIMEOUT` | `30` | Fetch timeout (s) |
-| `MAX_CONTENT_LENGTH` | `5000000` | Max response body (bytes) |
-| `SEARCH_MAX_RESULTS` | `10` | Hard cap on `max_results` |
-| `RENDER_ENABLED` | `false` | Enable Playwright JS-rendered fetch (needs Chromium; ~150MB image if you also `playwright install chromium`) |
+```bash
+# Terminal 1 — Python MCP server (port 8765)
+cd apps/mcp-server && uv run --no-sync free-web-mcp --transport http --host 127.0.0.1 --port 8765
+
+# Terminal 2 — Next.js dashboard (port 3000)
+pnpm dev
+
+# Terminal 3 — local blockchain (Anvil, port 8545) — optional for anchoring
+anvil --port 8545
+```
+
+### 3. See it work
+
+- **Dashboard**: http://localhost:3000 — System Online, live status probes,
+  evidence statistics, **Run Demo** button (search → fetch → extract → verify → hash).
+- **CLI demo**: `pnpm demo` prints the same pipeline.
+- **Evidence records**: http://localhost:3000/evidence and `/evidence/EV-XXXXXX`.
+- **Anchor on-chain** (needs a contract): click **Anchor Evidence** on a detail
+  page, confirm, and the hash is registered on the EvidenceRegistry.
+
+### Environment
+
+Copy `.env.example` → `.env.local` (web) / `.env` (mcp-server). Key vars:
+
+| Var | Purpose |
+| --- | --- |
+| `BSC_RPC_URL` | Chain RPC (Anvil `http://127.0.0.1:8545` or BSC Testnet) |
+| `EVIDENCE_REGISTRY_ADDRESS` | Deployed contract address (after `forge script`) |
+| `WALLET_PRIVATE_KEY` | Server-side signer for anchoring (**never** in frontend/logs) |
+| `MCP_SERVER_URL` | Where the dashboard finds the MCP server (`http://127.0.0.1:8765`) |
+
+> **Private keys must never be committed, logged, or sent to the frontend.**
+> See [SECURITY.md](SECURITY.md).
+
+---
+
+## Smart contract (Phase 5)
+
+```bash
+cd contracts
+forge build
+forge test          # 6 tests
+# local Anvil
+anvil --port 8545 &
+forge script script/Deploy.s.sol:DeployEvidenceRegistry \
+  --rpc-url http://127.0.0.1:8545 --broadcast
+# BSC Testnet (needs tBNB — never use a real key)
+forge script script/Deploy.s.sol:DeployEvidenceRegistry \
+  --rpc-url https://data-seed-prebsc-1-s1.binance.org:8545 \
+  --private-key $PRIVATE_KEY --broadcast
+```
+
+The deployed address goes into `.env.local` as `EVIDENCE_REGISTRY_ADDRESS`.
+The dashboard then flips `Blockchain → CONNECTED` and the Anchor button works.
+
+---
+
+## MCP tools (Python server)
+
+| Tool | Description |
+| --- | --- |
+| `web_search(query, max_results)` | DuckDuckGo search; each result has `source_domain` + `confidence` |
+| `web_fetch(url, rendered?)` | Fetch + extract main text; returns `meta` (domain_type, https, published_at, author…) |
+| `web_search_and_fetch(query, max_results, rendered?)` | Search then fetch Top-N in one call |
+| `web_summarize_with_sources(url, html?, max_links?)` | Classify outgoing links primary/secondary/tertiary |
+| `extract_claims(text)` | Split text into claims, classify fact/event/number/date/relationship/opinion/inference |
+| `find_counter_evidence(claim)` | Generate counter-evidence search directions |
+| `create_evidence_record(claim, supporting, contradicting?, cross_verified?)` | Build + persist an evidence package via the dashboard API |
+| `get_evidence(id)` | Fetch a persisted evidence package |
+
+All errors return `{success:false, error:{type, message}}` with a stable
+`type` (INVALID_URL, FETCH_FAILED, TIMEOUT, HTTP_ERROR, PARSER_ERROR,
+SEARCH_FAILED, RATE_LIMITED, CONTENT_TOO_LARGE, RENDER_FAILED,
+RENDER_TIMEOUT, INTERNAL_ERROR).
 
 ---
 
 ## Architecture
 
 ```
-MCP Client (Claude / Cursor / ChatGPT / Inspector)
-        |  Streamable HTTP
-        v
-+--------------------------------------+
-|  free-web-mcp                        |
-|  +-------------------------+         |
-|  | MCP Tool Layer          |  <- only this layer is exposed to MCP
-|  |  web_search             |  |     (4 tools, all return typed JSON)
-|  |  web_fetch              |  |
-|  |  web_search_and_fetch   |  |
-|  |  web_summarize_with_sources |
-|  +-----------+-------------+         |
-|              v                       |
-|  +-------------------------+         |
-|  | Service Layer           |  |  SearchService / FetchService
-|  +-----------+-------------+  |  (orchestrate providers + parser)
-|              v                       |
-|  +-------------------------+         |
-|  | Provider Layer          |  |  DuckDuckGo (default, no API key)
-|  |                         |  |  WebClient (unified HTTP)
-|  |                         |  |  trafilatura + BeautifulSoup
-|  |                         |  |  Playwright (optional, JS render)
-|  +-------------------------+         |
-+--------------------------------------+
+┌─────────────┐   ┌───────────────────────────────┐
+│ MCP Clients │──▶│ apps/mcp-server (Python)      │
+│ Cursor /    │   │ 8 tools, error-wrapped        │
+│ Claude /    │   └───────────────┬───────────────┘
+│ ChatGPT     │                   │ MCP_SERVER_URL
+└─────────────┘                   ▼
+┌─────────────────────────────────────────────────┐
+│ apps/web (Next.js dashboard + API)              │
+│  /api/evidence  create/list/stats               │
+│  /api/evidence/[id]  detail                     │
+│  /api/demo/run   one-click demo pipeline        │
+│  /api/anchor/[id]  on-chain write (confirm req) │
+│  SQLite: apps/web/data/evidence.db              │
+└──────────────┬────────────────┬─────────────────┘
+               │                │
+               ▼                ▼
+┌──────────────────────┐  ┌─────────────────────────┐
+│ packages/evidence    │  │ packages/blockchain     │
+│ claims / engine /    │  │ viem client for         │
+│ canonical SHA-256    │  │ EvidenceRegistry        │
+└──────────────────────┘  └────────────┬────────────┘
+                                       ▼
+                        EvidenceRegistry.sol (contracts/)
+                        BSC Testnet (97) or Anvil (31337)
 ```
 
-Strict layering: MCP tools **never** issue HTTP or parse HTML directly — every request goes through `WebClient`, every search through a `SearchProvider`, every parse through `parser.extract_*`. Swap in a new search engine by adding a provider; MCP tools do not change.
-
-See [docs/free_web_mcp.md](docs/free_web_mcp.md) for the full design doc.
-
----
-
-## Tested with
-
-- **Cursor** (MCP via stdio and via the public HTTP URL) — all 4 tools exercised end-to-end against real DuckDuckGo + Wikipedia.
-- **Claude Desktop** — same `claude_desktop_config.json` block above, MCP 2025-06-18 transport.
-- **Built-in Python MCP test harness** (`mcp.shared.memory.create_connected_server_and_client_session`) — `tests/test_mcp.py` covers tool registration, return shapes, error wrapping, and the rendered / disabled paths without network.
-- **`scripts/e2e_stdio_check.py`** — stdio e2e, spawns the server, calls every tool, asserts on real DuckDuckGo and Wikipedia responses.
-- **`scripts/e2e_http_check.py`** — Streamable HTTP e2e against the live ngrok URL.
-
-> **Not yet exercised in this submission**: ChatGPT Connectors UI (the protocol is the same MCP 2025-06-18 it expects; add the URL via Settings → Connectors and the assistant can call the tools); Chrome with WebMCP enabled (the server can be wired into a WebMCP page via `examples/webmcp_demo.html`).
+Layering rule: MCP tools never touch storage or chain directly — they call the
+dashboard API; the dashboard owns SQLite + the on-chain signer.
 
 ---
 
-## Built with
-
-- **Primary AI tool**: [ZCode](https://zcode.io) (agent runtime on the `MiniMax-M3` model). ZCode wrote 9 of 10 commits in this repo — scaffolding, models, web layer, MCP layer, all 39 tests, deployment configs, the v1->v2->v3 feature split, and the `Host` header / 421 debugging that turned the ngrok URL green.
-- **No other AI tools were used** in this project (no Cursor Composer, no Copilot Chat, no Claude.ai, no ChatGPT web).
-- **Doc research** was done inside the same ZCode session using WebFetch against MCP, WebMCP, Cloudflare, and Render docs.
-- **Design decisions** (which tools to ship, error code taxonomy, v1->v3 scope, the MCP-not-WebMCP framing) were made by the human author and reviewed against every ZCode-produced diff before commit.
-- See [docs/AI_TOOLS_USED.md](docs/AI_TOOLS_USED.md) for the full breakdown.
-
----
-
-## Deployment
-
-- **Render (permanent)**: `render.yaml` is included — one-click Blueprint import. See [docs/deploy_live_url.md](docs/deploy_live_url.md).
-- **ngrok (instant)**: `ngrok http 8000` while `free-web-mcp --transport http` is running. Used for the current live URL above.
-- **Docker**: `docker build -f docker/Dockerfile -t free-web-mcp .` then `docker run --rm -p 8000:8000 free-web-mcp`. To enable `rendered=true` paths, build with `--build-arg INSTALL_PLAYWRIGHT_BROWSERS=true`.
-
----
-
-## Development
+## Testing
 
 ```bash
-uv sync
-uv run pytest                # 39 tests, no real network needed
-uv run ruff check .          # lint
-uv run mypy                  # type check (strict)
+# Python (44 + SSRF tests)
+cd apps/mcp-server && uv run pytest -q
+
+# Node (evidence engine 15, blockchain, web db 6)
+pnpm -r test
+
+# Type checks
+pnpm -r typecheck
+cd apps/mcp-server && uv run mypy
 ```
 
-CI runs the same three commands on every push — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+CI runs all of the above on every push — see [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ---
+
+## Security
+
+See [SECURITY.md](SECURITY.md) — SSRF protection, private-key handling,
+threat model, what is and isn't logged. Key points:
+
+- `WebClient` rejects private/local/link-local addresses (SSRF, spec §30).
+- Rate limits on `/api/demo/run` and `/api/anchor`.
+- On-chain writes require explicit `{confirm: true}` and are signed only by
+  the server-side wallet from `WALLET_PRIVATE_KEY`.
+- No real funds, no mainnet, no promises of exchange listing. Testnet only.
+
+---
+
+## Roadmap
+
+- **Done (v0.3)**: dashboard + evidence engine + SQLite + 8 MCP tools +
+  EvidenceRegistry contract (Anvil verified) + demo mode + SSRF/rate limits.
+- **Phase 2 (next)**: VERI Test Token (BEP-20, testnet only), Validator
+  votes, reward incentives.
+- **Phase 3**: BNB Greenfield storage, ERC-8004 agent identity, MPP payments.
 
 ## License
 

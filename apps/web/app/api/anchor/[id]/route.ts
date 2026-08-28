@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRegistryClient } from "@/lib/blockchain";
 import { getEvidenceHash, getEvidencePackage, markAnchored } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,19 @@ interface AnchorBody {
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  // Rate limit anchoring (spec §30): 20 anchors / 60s per client IP — a
+  // permanent on-chain write should not be spammable.
+  const rl = rateLimit(request, { limit: 20, windowMs: 60_000 });
+  if (!rl.ok) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { type: "RATE_LIMITED", message: "Too many anchor attempts — try again shortly." },
+      },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } },
+    );
+  }
+
   let body: AnchorBody;
   try {
     body = (await request.json()) as AnchorBody;

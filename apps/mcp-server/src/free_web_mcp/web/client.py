@@ -53,9 +53,37 @@ class WebClient:
         if parsed.scheme not in ("http", "https"):
             raise ToolError(ErrorCode.INVALID_URL, "URL must start with http:// or https://.")
 
+    @staticmethod
+    def _is_ssrf_risk(host: str) -> bool:
+        """Reject localhost / private / link-local targets (spec §30 SSRF
+        protection). Covers literal hostnames and the reserved IP ranges a
+        malicious DNS name could resolve to."""
+        if host in ("localhost", "localhost.localdomain"):
+            return True
+        if host.endswith(".local") or host.endswith(".localhost"):
+            return True
+        try:
+            import ipaddress
+
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            return False
+        return (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        )
+
     async def get(self, url: str) -> PageContent:
         """GET a page, mapping network failures to stable ToolError codes."""
         self._validate_url(url)
+        parsed = AnyUrl(url)
+        host = (parsed.host or "").lower()
+        if self._is_ssrf_risk(host):
+            raise ToolError(ErrorCode.INVALID_URL, "Private or local addresses are not allowed.")
         logger.info("web_fetch url=%s", url)
         try:
             response = await self._client.get(url)

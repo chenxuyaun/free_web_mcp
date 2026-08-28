@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildEvidencePackage, type EvidenceSource } from "@free-web-mcp/evidence";
 import { insertEvidence } from "@/lib/db";
 import { McpClient } from "@/lib/mcp";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,19 @@ interface SearchResult {
  *  permanent public write and requires explicit user confirmation (spec §13);
  *  the UI offers it right after this call succeeds.
  */
-export async function POST() {
+export async function POST(request: Request) {
+  // Rate limit demo runs (spec §30): 10 runs / 60s per client IP.
+  const rl = rateLimit(request, { limit: 10, windowMs: 60_000 });
+  if (!rl.ok) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: { type: "RATE_LIMITED", message: "Too many demo runs — try again shortly." },
+      },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } },
+    );
+  }
+
   const steps: DemoStep[] = [];
   const claimText = "Anthropic released the Model Context Protocol in November 2024";
   const mcpBase = process.env.MCP_SERVER_URL || "http://127.0.0.1:8765";

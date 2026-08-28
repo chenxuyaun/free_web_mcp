@@ -7,12 +7,12 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Lint, type-check, and test
+  python:
+    name: Python (mcp-server) lint/type/test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
+    defaults:
+      run:
+        working-directory: apps/mcp-server
     steps:
       - uses: actions/checkout@v4
 
@@ -20,10 +20,10 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "apps/mcp-server/uv.lock"
 
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      - name: Set up Python 3.12
+        run: uv python install 3.12
 
       - name: Sync dependencies
         run: uv sync --frozen
@@ -36,3 +36,32 @@ jobs:
 
       - name: Test (pytest)
         run: uv run pytest -q
+
+  node:
+    name: Node (web + packages) lint/type/test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check (TS)
+        run: pnpm -r typecheck
+
+      - name: Test (vitest)
+        run: pnpm -r test
+
+      - name: Build web
+        run: pnpm --filter @free-web-mcp/web build
