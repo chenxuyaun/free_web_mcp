@@ -38,9 +38,14 @@ export default async function Home() {
       <section className="mt-10">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Evidence Statistics</h2>
-          <Link href="/evidence" className="text-sm text-neutral-400 hover:text-neutral-200">
-            View all evidence →
-          </Link>
+          <div className="flex gap-4 text-sm text-neutral-400">
+            <Link href="/evidence" className="hover:text-neutral-200">
+              View all evidence →
+            </Link>
+            <Link href="/validators" className="hover:text-neutral-200">
+              Validator leaderboard →
+            </Link>
+          </div>
         </div>
         <StatsGrid stats={stats} />
       </section>

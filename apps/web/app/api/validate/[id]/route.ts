@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { getEvidencePackage, recordVote, type ValidatorVote } from "@/lib/db";
+import {
+  assessmentToExpectedVote,
+  getEvidencePackage,
+  priorSupportExists,
+  recordVote,
+  type ValidatorVote,
+} from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -28,7 +34,8 @@ const VERI_ABI = [
 ] as const;
 
 /** VERI reward per correct vote (test incentive, spec §26). */
-const REWARD_VERI = 100n * 10n ** 18n; // 100 VERI
+const REWARD_BASE = 100n * 10n ** 18n; // 100 VERI per correct vote
+const REWARD_CHALLENGE = 200n * 10n ** 18n; // 200 VERI per successful challenge
 
 interface ValidateBody {
   validator: string; // wallet address of the validator
@@ -81,9 +88,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // Correctness is determined locally (vote vs assessment status).
   // Reward minting happens on-chain only when the vote is correct AND the
   // user explicitly confirms the chain write.
-  const { assessmentToExpectedVote } = await import("@/lib/db");
   const expected = assessmentToExpectedVote(pkg.assessment.status);
   const correct = body.vote === expected;
+  // Challenge detection (spec §25-26): a correct CONTRADICT against evidence
+  // another validator previously SUPPORTED is a successful challenge.
+  const isChallenge =
+    correct && body.vote === "CONTRADICT" && priorSupportExists(params.id, validator);
+  // Successful challenges earn double (200 vs 100) — challenge reward tier.
+  const reward = isChallenge ? REWARD_CHALLENGE : REWARD_BASE;
 
   let rewardAmount: string | null = null;
   let rewardTx: string | null = null;
@@ -112,14 +124,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
         address: veriAddress as `0x${string}`,
         abi: VERI_ABI,
         functionName: "mint",
-        args: [validator as `0x${string}`, REWARD_VERI],
+        args: [validator as `0x${string}`, reward],
         account,
         chain: network,
       });
       const publicClient = createPublicClient({ chain: network, transport: http(rpc) });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       rewardTx = txHash;
-      rewardAmount = REWARD_VERI.toString();
+      rewardAmount = reward.toString();
     } catch (e) {
       return NextResponse.json(
         {
@@ -150,5 +162,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     rewarded: rewardTx !== null,
     rewardAmount: rewardAmount ? `${(BigInt(rewardAmount) / 10n ** 18n).toString()} VERI` : null,
     rewardTx,
+    challenge: isChallenge,
   });
 }

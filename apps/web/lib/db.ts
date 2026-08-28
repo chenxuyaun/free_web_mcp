@@ -92,6 +92,11 @@ export function ensureSchema(db: Db): void {
       created_at     TEXT NOT NULL
     );
   `);
+  // Migration: older DBs predate challenge_of (M1B challenge rewards).
+  const voteCols = (db.pragma("table_info(votes)") as Array<{ name: string }>).map((c) => c.name);
+  if (!voteCols.includes("challenge_of")) {
+    db.exec("ALTER TABLE votes ADD COLUMN challenge_of TEXT");
+  }
 }
 
 export function closeDb(dbPath?: string): void {
@@ -250,6 +255,7 @@ export interface VoteRecord {
   correct: boolean;
   rewardAmount: string | null;
   rewardTx: string | null;
+  challengeOf: string | null;
   createdAt: string;
 }
 
@@ -284,9 +290,24 @@ export function recordVote(input: {
   const correct = input.vote === expected;
   const now = new Date().toISOString();
 
+  // Challenge (spec §25-26): a correct CONTRADICT vote against an evidence
+  // that another validator previously (correctly) SUPPORTED is a successful
+  // challenge of that earlier verification.
+  let challengeOf: string | null = null;
+  if (input.vote === "CONTRADICT" && correct) {
+    const prior = db
+      .prepare(
+        `SELECT validator FROM votes
+         WHERE evidence_id = ? AND vote = 'SUPPORT' AND validator != ?
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(input.evidenceId, input.validator.toLowerCase()) as { validator: string } | undefined;
+    challengeOf = prior?.validator ?? null;
+  }
+
   db.prepare(
-    `INSERT INTO votes (evidence_id, validator, vote, correct, reward_amount, reward_tx, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO votes (evidence_id, validator, vote, correct, reward_amount, reward_tx, challenge_of, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     input.evidenceId,
     input.validator.toLowerCase(),
@@ -294,6 +315,7 @@ export function recordVote(input: {
     correct ? 1 : 0,
     input.rewardAmount ?? null,
     input.rewardTx ?? null,
+    challengeOf,
     now,
   );
 
@@ -327,6 +349,7 @@ export function recordVote(input: {
     correct: number;
     reward_amount: string | null;
     reward_tx: string | null;
+    challenge_of: string | null;
     created_at: string;
   };
   return {
@@ -337,8 +360,37 @@ export function recordVote(input: {
     correct: row.correct === 1,
     rewardAmount: row.reward_amount,
     rewardTx: row.reward_tx,
+    challengeOf: row.challenge_of,
     createdAt: row.created_at,
   };
+}
+
+export function listVotesForEvidence(evidenceId: string, dbPath?: string): VoteRecord[] {
+  const db = getDb(dbPath);
+  const rows = db
+    .prepare("SELECT * FROM votes WHERE evidence_id = ? ORDER BY created_at ASC")
+    .all(evidenceId) as Array<{
+    id: number;
+    evidence_id: string;
+    validator: string;
+    vote: string;
+    correct: number;
+    reward_amount: string | null;
+    reward_tx: string | null;
+    challenge_of: string | null;
+    created_at: string;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    evidenceId: r.evidence_id,
+    validator: r.validator,
+    vote: r.vote as ValidatorVote,
+    correct: r.correct === 1,
+    rewardAmount: r.reward_amount,
+    rewardTx: r.reward_tx,
+    challengeOf: r.challenge_of,
+    createdAt: r.created_at,
+  }));
 }
 
 export function getValidatorStats(address: string, dbPath?: string): ValidatorStats | null {
@@ -376,6 +428,7 @@ export function listVotes(dbPath?: string): VoteRecord[] {
     correct: number;
     reward_amount: string | null;
     reward_tx: string | null;
+    challenge_of: string | null;
     created_at: string;
   }>;
   return rows.map((r) => ({
@@ -386,6 +439,7 @@ export function listVotes(dbPath?: string): VoteRecord[] {
     correct: r.correct === 1,
     rewardAmount: r.reward_amount,
     rewardTx: r.reward_tx,
+    challengeOf: r.challenge_of,
     createdAt: r.created_at,
   }));
 }
@@ -408,4 +462,18 @@ export function listValidators(dbPath?: string): ValidatorStats[] {
     successfulChallenges: r.successful_challenges,
     totalVotes: r.total_votes,
   }));
+}
+
+/** True if another validator previously voted SUPPORT on this evidence —
+ *  the precondition for a successful challenge (M1B). */
+export function priorSupportExists(evidenceId: string, validator: string, dbPath?: string): boolean {
+  const db = getDb(dbPath);
+  const row = db
+    .prepare(
+      `SELECT 1 FROM votes
+       WHERE evidence_id = ? AND vote = 'SUPPORT' AND validator != ?
+       LIMIT 1`,
+    )
+    .get(evidenceId, validator.toLowerCase());
+  return row !== undefined;
 }
