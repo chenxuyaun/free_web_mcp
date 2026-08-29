@@ -7,7 +7,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: {
-    baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
+    // Next.js runs with basePath=/webmcp (sub-path deployment), so all
+    // navigations and the webServer health check must go through /webmcp.
+    baseURL: process.env.E2E_BASE_URL || "http://localhost:3000/webmcp",
     trace: "retain-on-failure",
   },
   projects: [
@@ -20,7 +22,7 @@ export default defineConfig({
     ? undefined
     : {
         command: "pnpm --filter @free-web-mcp/web build && pnpm --filter @free-web-mcp/web start",
-        url: "http://localhost:3000/api/health",
+        url: "http://localhost:3000/webmcp/api/health",
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,
       },
