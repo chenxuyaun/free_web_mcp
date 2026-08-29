@@ -204,11 +204,18 @@ threat model, what is and isn't logged. Key points:
 
 ## Roadmap
 
-- **Done (v0.3)**: dashboard + evidence engine + SQLite + 8 MCP tools +
-  EvidenceRegistry contract (Anvil verified) + demo mode + SSRF/rate limits.
-- **Phase 2 (next)**: VERI Test Token (BEP-20, testnet only), Validator
-  votes, reward incentives.
-- **Phase 3**: BNB Greenfield storage, ERC-8004 agent identity, MPP payments.
+- **v0.3 (done)**: dashboard + evidence engine + SQLite + 8 MCP tools +
+  EvidenceRegistry contract (BSC Testnet: `0xD4F1…85D7`) + demo mode +
+  SSRF/rate limits.
+- **v0.4 (done)**: VERI Test Token (BEP-20, testnet: `0x4FF8…50Da`) +
+  validator votes & rewards + multi-provider search aggregation +
+  **BNB Greenfield evidence publishing** (§27, content-addressed) +
+  **ERC-8004 agent identity** (§28, registered on the official BSC Testnet
+  registry, agentId 2006) + Playwright e2e.
+- **Next (watchlist)**: ERC-8004 reputation feedback writing (needs a
+  second non-owner wallet — the registry blocks self-feedback); agent
+  payments (§29) gated on B402/x402 BSC facilitator self-service; BNB
+  Greenfield mainnet when ready.
 
 ## License
 

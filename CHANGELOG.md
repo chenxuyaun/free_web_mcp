@@ -4,6 +4,35 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-08-28
+
+### Added — Verifiable Web Evidence Network (full stack)
+
+- **Evidence network on BSC Testnet (live)**:
+  - `EvidenceRegistry` deployed at `0xD4F14929A1694932439DDa1D481aA127f80185D7`
+    (verified anchor TX on BscScan).
+  - **VERI** BEP-20 reward token at `0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da`
+    (100M supply, owner mint for rewards).
+  - Validator vote system (`/api/validate/[id]`): correct votes mint 100 VERI,
+    successful challenges (contradicting a previously-supported claim) mint 200.
+  - ERC-8004 agent identity: registered on the official BSC Testnet Identity
+    Registry (`0x8004A818…BD9e`) as **agentId 2006** — zero contract deployment.
+- **BNB Greenfield decentralized storage (spec §27)**: new `packages/storage`
+  publishes canonical evidence JSON content-addressed (objectName = sha256) to
+  Greenfield testnet; anchor writes the real decentralized URI on-chain.
+- **Multi-provider search aggregation**: DuckDuckGo primary with Bing + Baidu
+  HTML fallbacks, URL dedupe, `SEARCH_PROVIDER` switch.
+- **Dashboard**: evidence list/detail pages, statistics grid, validator
+  leaderboard (`/validators`), evidence timeline, one-click demo runner,
+  on-chain anchor feed (live `exists()` verification), agent identity card,
+  evidence list filtering, Export JSON.
+- **MCP server**: 8 tools (4 web + 4 evidence), all with doc-rich metadata,
+  annotations and typed input schemas; `/.well-known/mcp.json`; SSRF
+  protection; Python 50 tests.
+- **Quality**: Playwright e2e (4 offline flows + CI job), full monorepo CI
+  (Python + Node), strict typing throughout (mypy/tsc), 80+ tests green.
+
+
 ## [0.2.0] - 2026-08-28
 
 ### Added
