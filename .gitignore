@@ -29,3 +29,6 @@ apps/web/data/
 test-results/
 deploy/.env
 deploy/web.env
+
+# B402 API signing keys (never commit)
+deploy/b402/
