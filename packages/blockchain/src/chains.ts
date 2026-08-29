@@ -1,5 +1,13 @@
 /** BSC Testnet + Anvil chain configs (spec §17). */
-import { defineChain } from "viem";
+import { defineChain, http } from "viem";
+
+// The legacy data-seed-prebsc-*.binance.org endpoints are frequently dead or
+// unreachable from cloud servers; publicnode/drpc are reliable alternatives.
+export const BSC_TESTNET_RPCS = [
+  "https://bsc-testnet-rpc.publicnode.com",
+  "https://bsc-testnet.bnbchain.org",
+  "https://bsc-testnet.drpc.org",
+];
 
 export const bscTestnet = defineChain({
   id: 97,
@@ -7,10 +15,10 @@ export const bscTestnet = defineChain({
   nativeCurrency: { name: "tBNB", symbol: "tBNB", decimals: 18 },
   rpcUrls: {
     default: {
-      http: ["https://data-seed-prebsc-1-s1.binance.org:8545"],
+      http: BSC_TESTNET_RPCS,
     },
     public: {
-      http: ["https://data-seed-prebsc-1-s1.binance.org:8545"],
+      http: BSC_TESTNET_RPCS,
     },
   },
   blockExplorers: {
@@ -30,6 +38,15 @@ export const anvil = defineChain({
   },
   testnet: true,
 });
+
+/** Short-timeout, no-retry HTTP transport so a dead RPC can never stall the
+ *  dashboard: every viem call fails within RPC_TIMEOUT_MS instead of retrying
+ *  for ~40s with viem defaults (10s timeout × 3 retries + backoff). */
+export const RPC_TIMEOUT_MS = 5_000;
+
+export function rpcHttp(url: string) {
+  return http(url, { timeout: RPC_TIMEOUT_MS, retryCount: 0 });
+}
 
 export const ANVIL_PRIVATE_KEY =
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // anvil account #0 (test only)

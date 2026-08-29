@@ -179,12 +179,16 @@ async function probeBlockchain(): Promise<ServiceRow> {
       detail: !rpc ? "BSC_RPC_URL not set" : "no contract deployed",
     };
   }
-  // Real probe: read chainId and contract bytecode via viem (H4).
+  // Real probe: read chainId and contract bytecode via viem (H4). Runs both
+  // calls in parallel under a hard deadline so a dead RPC never stalls the
+  // dashboard (viem transport is also hardened in packages/blockchain).
   try {
     const cfg = getRegistryConfig();
     const client = new EvidenceRegistryClient(cfg);
-    const chainId = await client.getChainId();
-    const hasCode = await client.hasContract();
+    const [chainId, hasCode] = await withHardTimeout(
+      Promise.all([client.getChainId(), client.hasContract()]),
+      BLOCKCHAIN_PROBE_TIMEOUT_MS,
+    );
     if (!hasCode) {
       return {
         key: "BLOCKCHAIN",
@@ -207,4 +211,23 @@ async function probeBlockchain(): Promise<ServiceRow> {
       detail: e instanceof Error ? e.message : String(e),
     };
   }
+}
+
+const BLOCKCHAIN_PROBE_TIMEOUT_MS = 6_000;
+
+/** Reject after ms even if the underlying promise is still pending. */
+function withHardTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`probe timed out after ${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
 }

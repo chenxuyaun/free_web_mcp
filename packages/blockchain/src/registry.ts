@@ -1,14 +1,13 @@
 import {
   createPublicClient,
   createWalletClient,
-  http,
   type Chain,
   type Hex,
   type PublicClient,
   type WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { EVIDENCE_REGISTERED_EVENT, EVIDENCE_REGISTRY_ABI } from "./chains";
+import { EVIDENCE_REGISTERED_EVENT, EVIDENCE_REGISTRY_ABI, rpcHttp } from "./chains";
 
 export interface AnchorResult {
   txHash: Hex;
@@ -36,7 +35,7 @@ export class EvidenceRegistryClient {
   constructor(opts: RegistryClientOptions) {
     this.publicClient = createPublicClient({
       chain: opts.chain,
-      transport: http(opts.rpcUrl),
+      transport: rpcHttp(opts.rpcUrl),
     });
     this.registryAddress = opts.registryAddress;
     this.chain = opts.chain;
@@ -47,7 +46,7 @@ export class EvidenceRegistryClient {
       this.walletClient = createWalletClient({
         account,
         chain: opts.chain,
-        transport: http(opts.rpcUrl),
+        transport: rpcHttp(opts.rpcUrl),
       });
     }
   }

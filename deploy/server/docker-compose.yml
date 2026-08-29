@@ -1,0 +1,50 @@
+{
+  "services": {
+    "web": {
+      "image": "free-web-mcp/web:latest",
+      "restart": "unless-stopped",
+      "command": [
+        "pnpm",
+        "exec",
+        "next",
+        "start",
+        "-p",
+        "3000",
+        "-H",
+        "0.0.0.0"
+      ],
+      "ports": [
+        "3100:3000"
+      ],
+      "environment": {
+        "NODE_ENV": "production",
+        "BSC_NETWORK": "bsc-testnet",
+        "BSC_RPC_URL": "${BSC_RPC_URL:-https://bsc-testnet-rpc.publicnode.com}",
+        "BSC_EXPLORER_URL": "https://testnet.bscscan.com",
+        "EVIDENCE_REGISTRY_ADDRESS": "${EVIDENCE_REGISTRY_ADDRESS}",
+        "VERI_TOKEN_ADDRESS": "${VERI_TOKEN_ADDRESS}",
+        "WALLET_PRIVATE_KEY": "${WALLET_PRIVATE_KEY}",
+        "MCP_SERVER_URL": "http://mcp:8766"
+      },
+      "volumes": [
+        "web-data:/app/apps/web/data"
+      ],
+      "depends_on": [
+        "mcp"
+      ]
+    },
+    "mcp": {
+      "image": "free-web-mcp/mcp:latest",
+      "restart": "unless-stopped",
+      "ports": [
+        "8766:8766"
+      ],
+      "environment": {
+        "SEARCH_PROVIDER": "auto"
+      }
+    }
+  },
+  "volumes": {
+    "web-data": null
+  }
+}

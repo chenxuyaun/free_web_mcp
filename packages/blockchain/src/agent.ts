@@ -15,10 +15,10 @@ import {
   createPublicClient,
   createWalletClient,
   decodeEventLog,
-  http,
   type Chain,
   type Hex,
 } from "viem";
+import { rpcHttp } from "./chains";
 
 export const ERC8004_IDENTITY_ADDRESS_TESTNET: Hex =
   "0x8004A818BFB912233c491871b3d84c89A494BD9e";
@@ -149,7 +149,7 @@ export class ReputationClient {
     const wc = createWalletClient({
       account,
       chain: this.cfg.chain,
-      transport: http(this.cfg.rpcUrl),
+      transport: rpcHttp(this.cfg.rpcUrl),
     });
     const txHash = await wc.writeContract({
       address: this.reputationAddress,
@@ -168,7 +168,7 @@ export class ReputationClient {
       account,
       chain: this.cfg.chain,
     });
-    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: rpcHttp(this.cfg.rpcUrl) });
     await pc.waitForTransactionReceipt({ hash: txHash });
     return txHash;
   }
@@ -180,7 +180,7 @@ export class ReputationClient {
     tag1 = "",
     tag2 = "",
   ): Promise<ReputationSummary> {
-    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: rpcHttp(this.cfg.rpcUrl) });
     const [count, value, decimals] = await pc.readContract({
       address: this.reputationAddress,
       abi: ERC8004_REPUTATION_ABI,
@@ -216,7 +216,7 @@ export class AgentIdentityClient {
   }
 
   async hasRegistry(): Promise<boolean> {
-    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: rpcHttp(this.cfg.rpcUrl) });
     const code = await pc.getCode({ address: this.identityAddress });
     return code !== undefined && code !== "0x" && code.length > 2;
   }
@@ -224,10 +224,10 @@ export class AgentIdentityClient {
   /** Mint the agent identity; returns the agentId parsed from the Transfer event. */
   async register(agentURI: string): Promise<RegisterResult> {
     if (!this.cfg.privateKey) throw new Error("No signer configured (WALLET_PRIVATE_KEY).");
-    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: rpcHttp(this.cfg.rpcUrl) });
     const { privateKeyToAccount } = await import("viem/accounts");
     const account = privateKeyToAccount(this.cfg.privateKey);
-    const wc = createWalletClient({ account, chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const wc = createWalletClient({ account, chain: this.cfg.chain, transport: rpcHttp(this.cfg.rpcUrl) });
 
     const txHash = await wc.writeContract({
       address: this.identityAddress,
@@ -267,7 +267,7 @@ export class AgentIdentityClient {
   }
 
   async ownerOf(agentId: bigint): Promise<Hex> {
-    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: rpcHttp(this.cfg.rpcUrl) });
     return pc.readContract({
       address: this.identityAddress,
       abi: ERC8004_IDENTITY_ABI,
@@ -277,7 +277,7 @@ export class AgentIdentityClient {
   }
 
   async tokenURI(agentId: bigint): Promise<string> {
-    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: rpcHttp(this.cfg.rpcUrl) });
     return pc.readContract({
       address: this.identityAddress,
       abi: ERC8004_IDENTITY_ABI,
