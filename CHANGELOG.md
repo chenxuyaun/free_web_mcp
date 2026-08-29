@@ -4,6 +4,27 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-08-29
+
+### Added — self-hosted public deployment
+
+- **Live on yuncai.site** (Tencent Cloud + Docker Compose + nginx):
+  - Dashboard: `https://yuncai.site/webmcp` (Next.js `basePath=/webmcp`,
+    `lib/paths.ts` shared with client fetches)
+  - MCP server: `https://yuncai.site/mcp` (streamable HTTP, SSE unbuffered)
+  - Discovery doc: `https://yuncai.site/.well-known/mcp.json`
+- `deploy/server/docker-compose.yml` + `deploy/server/nginx-webmcp-locations.conf`.
+
+### Fixed
+
+- **viem RPC hardening**: all clients now use a 5s-timeout, zero-retry
+  transport (`rpcHttp`); the blockchain status probe runs `getChainId` +
+  `hasContract` in parallel under a 6s hard deadline. Before this, a dead
+  BSC RPC endpoint made `/api/health` take ~41s instead of ~1s.
+- Default BSC testnet RPCs point to publicnode / bnbchain.org / drpc
+  (the legacy `data-seed-prebsc-*.binance.org` endpoints are frequently
+  unreachable from cloud servers).
+
 ## [0.4.0] - 2026-08-28
 
 ### Added — Verifiable Web Evidence Network (full stack)
