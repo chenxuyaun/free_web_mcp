@@ -98,16 +98,18 @@ TEST_USER_PK=<agent pk> TOKEN_ADDRESS=<mock> RELAYER_ADDRESS=<relayer> \
 BSC 侧选 B402 官方（申请中）还是自托管 relayer（已验通），取决于回信结果。
 
 
-## MCP SDK 2.0 迁移备忘（2026-07-28 生态大地震）
+## MCP SDK 2.0 迁移（已完成，2026-08-29）
 
 MCP Python SDK 于 2026-07-28 发布 **2.0.0 破坏性大版本**（同日 MCP 协议改为
 无状态）：`FastMCP` 改名 `MCPServer`、`mcp.server.fastmcp` 移除、transport
 参数移到 `run()`、新增 `stateless_http=True`；v1 进入维护模式。
 
-- 本项目当前钉在 `mcp>=1.10,<2`（2025-06-18 协议 + 会话握手），**现有客户端
-  （Claude/Cursor）完全兼容，demo 不受影响，现在不升。**
-- 但 x402 支付网关的官方接入姿势（无状态 + `PAYMENT-REQUIRED`/
-  `PAYMENT-SIGNATURE`/`PAYMENT-RESPONSE` 头）是 2.x 时代的能力。
-- **决策：B402 凭据到位、做支付网关时一并升 2.x**。迁移面：FastMCP→MCPServer
-  改名、run() 签名、44+ pytest 适配、mcp 镜像重建。第三方 FastMCP 4.0.0b1
-  （mode="auto" 双时代兼容）可作备选，但官方 SDK 2.x 是主路径。
+- ✅ **已迁移到 `mcp>=2.0,<3`（2.1.1）并上线**：MCPServer + `version=` 上报
+  应用版本（线上实测 serverInfo 0.4.0）、`transport_security` 移到
+  `streamable_http_app()`、well-known 用公开 `list_tools()`（async）+ 注解
+  snake→camel 映射。50/50 pytest 绿、mypy/ruff 干净、线上 8 工具 + dashboard
+  探测全部验证通过（commit `1b95e0c`）。
+- **stateless_http 保持关闭**（legacy 会话协议，兼容现有客户端）；x402 支付
+  网关落地时翻转 `stateless_http=True` 并升级协议版本声明。
+- 坑：Dockerfile 的 `COPY pyproject.toml uv.lock` 需要**以 apps/mcp-server
+  为构建上下文**（根目录没有这些文件，用根上下文会静默构建出旧镜像）。

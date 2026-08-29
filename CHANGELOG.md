@@ -6,6 +6,18 @@ on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 
 ## [0.4.2] - 2026-08-29
 
+### Changed — MCP server on Python SDK 2.x
+
+- Migrated apps/mcp-server from `mcp>=1.10,<2` to `mcp>=2.0,<3` (2.1.1):
+  `FastMCP` → `MCPServer` (mcp.server.mcpserver), `version=` kwarg so
+  serverInfo reports the app version (verified 0.4.0 on the wire),
+  transport_security moved to streamable_http_app(), well-known doc uses
+  public async list_tools() with spec-camelCase annotations.
+- stateless_http stays off (legacy session protocol preserved for existing
+  clients); flip to True when the x402 payment gateway lands.
+- 50/50 pytest green, mypy/ruff clean; deployed to yuncai.site — /health,
+  /mcp initialize handshake, all 8 tools and dashboard probe verified live.
+
 ### Changed — VERI v2: bitcoin-style zero-premine emission
 
 - `VERI.sol` no longer takes an `initialSupply`: **totalSupply starts at 0**
