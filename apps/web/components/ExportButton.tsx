@@ -1,6 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { BASE_PATH } from "@/lib/paths";
 
 /** Download the full Evidence Package as JSON (Phase E). */
 export function ExportButton({ id }: { id: string }) {
@@ -8,7 +9,7 @@ export function ExportButton({ id }: { id: string }) {
     <button
       type="button"
       onClick={async () => {
-        const res = await fetch(`/api/evidence/${id}`);
+        const res = await fetch(`${BASE_PATH}/api/evidence/${id}`);
         const data = await res.json();
         const pkg = data.package ?? data;
         const blob = new Blob([JSON.stringify(pkg, null, 2)], {

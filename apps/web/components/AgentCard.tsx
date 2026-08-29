@@ -2,6 +2,7 @@
 
 import { BadgeCheck, Check, ExternalLink, Loader2, X } from "lucide-react";
 import { useState } from "react";
+import { BASE_PATH } from "@/lib/paths";
 
 interface Registration {
   agentId: string;
@@ -125,7 +126,7 @@ export function AgentCard({
                 setBusy(true);
                 setError(null);
                 try {
-                  const res = await fetch("/api/agent/register", {
+                  const res = await fetch(`${BASE_PATH}/api/agent/register`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ confirm: true }),

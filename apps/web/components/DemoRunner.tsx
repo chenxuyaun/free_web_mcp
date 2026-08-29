@@ -3,6 +3,7 @@
 import { Check, Loader2, Play, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { BASE_PATH } from "@/lib/paths";
 
 interface DemoStep {
   step: string;
@@ -46,7 +47,7 @@ export function DemoRunner() {
             setResult(null);
             setSteps([]);
             try {
-              const res = await fetch("/api/demo/run", { method: "POST" });
+              const res = await fetch(`${BASE_PATH}/api/demo/run`, { method: "POST" });
               const data = (await res.json()) as DemoResult;
               setSteps(data.steps ?? []);
               if (!res.ok || data.success === false) {

@@ -2,6 +2,7 @@
 
 import { Check, Loader2, X } from "lucide-react";
 import { useState } from "react";
+import { BASE_PATH } from "@/lib/paths";
 
 type Vote = "SUPPORT" | "CONTRADICT" | "UNCERTAIN";
 
@@ -34,7 +35,7 @@ export function ValidatorPanel({ id }: { id: string }) {
     setError(null);
     setResult(null);
     try {
-      const res = await fetch(`/api/validate/${id}`, {
+      const res = await fetch(`${BASE_PATH}/api/validate/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ validator, vote, confirm: confirmReward }),

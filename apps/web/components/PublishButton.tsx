@@ -2,6 +2,7 @@
 
 import { Check, ExternalLink, Loader2, CloudUpload, X } from "lucide-react";
 import { useState } from "react";
+import { BASE_PATH } from "@/lib/paths";
 
 interface PublishResult {
   success?: boolean;
@@ -45,7 +46,7 @@ export function PublishButton({ id, publishedUri }: { id: string; publishedUri: 
             setBusy(true);
             setError(null);
             try {
-              const res = await fetch(`/api/evidence/${id}/publish`, { method: "POST" });
+              const res = await fetch(`${BASE_PATH}/api/evidence/${id}/publish`, { method: "POST" });
               const data = (await res.json()) as PublishResult;
               if (!res.ok || data.success === false) {
                 setError(data.error?.message ?? `HTTP ${res.status}`);

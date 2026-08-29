@@ -2,6 +2,7 @@
 
 import { Anchor, Check, Loader2, X } from "lucide-react";
 import { useState } from "react";
+import { BASE_PATH } from "@/lib/paths";
 
 interface AnchorBlockchain {
   anchored: boolean;
@@ -75,7 +76,7 @@ export function AnchorButton({ id, alreadyAnchored }: { id: string; alreadyAncho
                 setBusy(true);
                 setError(null);
                 try {
-                  const res = await fetch(`/api/anchor/${id}`, {
+                  const res = await fetch(`${BASE_PATH}/api/anchor/${id}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ confirm: true }),
