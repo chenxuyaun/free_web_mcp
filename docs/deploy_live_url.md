@@ -1,6 +1,20 @@
 # Deploy Free Web MCP to a Public URL
 
-This guide covers two paths: a **permanent public URL via Render** (free tier)
+**Live deployment (self-hosted, yuncai.site):**
+
+| Endpoint | Purpose |
+| --- | --- |
+| `https://yuncai.site/webmcp` | Evidence Network dashboard (Next.js, basePath `/webmcp`) |
+| `https://yuncai.site/webmcp/api/health` | Dashboard liveness + live system status |
+| `https://yuncai.site/mcp` | Streamable-HTTP MCP transport (8 tools) |
+| `https://yuncai.site/.well-known/mcp.json` | MCP discovery document |
+
+Server: Tencent Cloud (124.221.130.64), Docker Compose (`~/free-web-mcp/`),
+nginx reverse proxy on yuncai.site (see `deploy/server/nginx-webmcp-locations.conf`).
+Redeploy flow: build `deploy/web.Dockerfile` locally → `docker save | gzip` →
+`scp` → `docker load` → `docker compose --env-file .env up -d --force-recreate web`.
+
+This guide also covers two alternative paths: a **permanent public URL via Render** (free tier)
 and an **instant temporary URL via ngrok** (for immediate demos).
 
 Both expose the same MCP server in HTTP transport mode:
