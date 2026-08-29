@@ -87,3 +87,11 @@ details (Free Web MCP — MCP server monetization, testnet wallet
   确认的集成范围"，联系渠道仍是 binanceconnect@binance.com。
 - **结论**：不存在绕过审批的自助商户通道；邮件申请是唯一正确路径，等待回信
   就是唯一状态。09-03 自动化为双通道监控（邮箱 + issue #28）。
+
+## 2026-08-29 深夜：Gmail 实查确认（通过用户登录中的 Chrome，只读）
+
+- 申请邮件确认发出：2026-08-29 15:47，发件人 yueshewushuang@gmail.com，
+  主题 "B402 / OnchainPay x402 — Sandbox Developer Account Application"。
+- 三路搜索（from:binanceconnect@binance.com / in:spam binance /
+  in:anywhere binance）均无回信；Gmail 中 binance 邮件最新一条就是申请邮件本身。
+- 结论：申请已送达，Binance 尚未回信。回信到达后需转发到 yueshen@agent.qq.com。
