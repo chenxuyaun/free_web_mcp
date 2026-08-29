@@ -111,7 +111,12 @@ export function ensureSchema(db: Db): void {
   if (!evCols.includes("payload_json")) {
     db.exec("ALTER TABLE evidence ADD COLUMN payload_json TEXT");
   }
+
+  // V1 protocol tables (claims / attestations / challenges / resolutions).
+  ensureProtocolSchema(db);
 }
+
+import { ensureProtocolSchema, ensureClaimRow } from "./protocol-db";
 
 export function closeDb(dbPath?: string): void {
   const p = pool();
@@ -162,6 +167,8 @@ export function insertEvidence(
     input.payloadJson ?? JSON.stringify(withId),
     withId.provenance.createdAt,
   );
+  // Every evidence package becomes a claim in the V1 protocol state machine.
+  ensureClaimRow(db, id, withId.provenance.createdAt);
   return withId;
 }
 
