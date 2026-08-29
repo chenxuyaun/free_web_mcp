@@ -34,7 +34,14 @@ After deployment, judges can connect from:
   } } }
   ```
 - **Cursor** — `.cursor/mcp.json` with `{"url": "https://<your-url>/mcp"}`
-- **Chrome with WebMCP** — requires `chrome://flags/#enable-webmcp-testing` in Chrome 149+; once enabled, visiting a page that calls `document.modelContext.registerTool()` exposes the tools to the in-page AI. Note: Chrome's WebMCP is still Origin Trial as of 2026; ChatGPT's in-app browser does **not** auto-discover arbitrary MCP servers — users must connect via Settings.
+- **Chrome with WebMCP** — Chrome 149–156 Origin Trial (open since 2026-06-09);
+  local testing via `chrome://flags/#enable-webmcp-testing` (146+). A page
+  calling `document.modelContext.registerTool()` exposes the tools to the
+  in-page AI. First mainstream consumer: **Gemini in Chrome** (announced at
+  I/O 2026). Edge has native support since 147 (`edge://flags`); WebKit is
+  opposed, Firefox has no position — still experimental, not a W3C standard.
+  Note: ChatGPT's in-app browser does **not** auto-discover arbitrary MCP
+  servers — users must connect via Settings.
 
 ---
 
