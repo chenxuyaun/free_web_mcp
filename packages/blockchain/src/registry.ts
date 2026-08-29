@@ -102,6 +102,45 @@ export class EvidenceRegistryClient {
     });
   }
 
+  /** True if the claim has been finally resolved on-chain (V1 protocol). */
+  async isResolved(hash: Hex): Promise<boolean> {
+    return this.publicClient.readContract({
+      address: this.registryAddress,
+      abi: EVIDENCE_REGISTRY_ABI,
+      functionName: "isResolved",
+      args: [hash],
+    });
+  }
+
+  /** Anchor the final resolution of a claim (V1 protocol).
+   *  One tx per finalized claim: result + method + resolutionRoot. */
+  async resolveClaim(
+    hash: Hex,
+    result: boolean,
+    method: string,
+    resolutionRoot: Hex,
+  ): Promise<AnchorResult> {
+    if (!this.walletClient) {
+      throw new Error("No signer configured — WALLET_PRIVATE_KEY is missing.");
+    }
+    const account = this.walletClient.account!;
+    const txHash = await this.walletClient.writeContract({
+      address: this.registryAddress,
+      abi: EVIDENCE_REGISTRY_ABI,
+      functionName: "resolveClaim",
+      args: [hash, result, method, resolutionRoot],
+      account,
+      chain: this.chain,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
+    return {
+      txHash,
+      blockNumber: receipt.blockNumber,
+      network: this.chain.name,
+      contractAddress: this.registryAddress,
+    };
+  }
+
   txUrl(txHash: Hex): string | null {
     if (!this.explorerUrl) return null;
     return `${this.explorerUrl}/tx/${txHash}`;

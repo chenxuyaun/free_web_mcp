@@ -103,6 +103,47 @@ export const EVIDENCE_REGISTRY_ABI = [
     name: "EvidenceRegistered",
     type: "event",
   },
+  {
+    inputs: [
+      { internalType: "bytes32", name: "claimHash_", type: "bytes32" },
+      { internalType: "bool", name: "result", type: "bool" },
+      { internalType: "string", name: "method", type: "string" },
+      { internalType: "bytes32", name: "resolutionRoot_", type: "bytes32" },
+    ],
+    name: "resolveClaim",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "bytes32", name: "claimHash_", type: "bytes32" }],
+    name: "isResolved",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "bytes32", name: "claimHash_", type: "bytes32" }],
+    name: "getResolution",
+    outputs: [
+      {
+        components: [
+          { internalType: "bytes32", name: "claimHash", type: "bytes32" },
+          { internalType: "bool", name: "result", type: "bool" },
+          { internalType: "string", name: "method", type: "string" },
+          { internalType: "bytes32", name: "resolutionRoot", type: "bytes32" },
+          { internalType: "uint256", name: "timestamp", type: "uint256" },
+          { internalType: "address", name: "resolver", type: "address" },
+          { internalType: "bool", name: "exists", type: "bool" },
+        ],
+        internalType: "struct EvidenceRegistry.ClaimResolutionRecord",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 /** Standalone typed event descriptor for getLogs queries. */

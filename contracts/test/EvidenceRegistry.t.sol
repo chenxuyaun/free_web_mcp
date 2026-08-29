@@ -61,4 +61,54 @@ contract EvidenceRegistryTest is Test {
         emit EvidenceRegistry.EvidenceRegistered(hash, "https://example.com/5", block.timestamp, address(this), "0.1.0");
         registry.registerEvidence(hash, "https://example.com/5", "0.1.0");
     }
+
+    // ---------- Claim resolution (V1 protocol) ----------
+
+    function test_ResolveClaim() public {
+        bytes32 claimHash = keccak256("claim-1");
+        bytes32 resRoot = keccak256("resolution-root-1");
+
+        registry.resolveClaim(claimHash, true, "OPTIMISTIC_FINALIZE", resRoot);
+
+        EvidenceRegistry.ClaimResolutionRecord memory r = registry.getResolution(claimHash);
+        assertEq(r.claimHash, claimHash);
+        assertEq(r.result, true);
+        assertEq(r.method, "OPTIMISTIC_FINALIZE");
+        assertEq(r.resolutionRoot, resRoot);
+        assertTrue(r.timestamp > 0);
+        assertTrue(r.exists);
+    }
+
+    function test_ResolveClaim_RevertOnDuplicate() public {
+        bytes32 claimHash = keccak256("claim-2");
+        registry.resolveClaim(claimHash, false, "CONSENSUS_VOTE", keccak256("root"));
+
+        vm.expectRevert("EvidenceRegistry: already resolved");
+        registry.resolveClaim(claimHash, true, "OPTIMISTIC_FINALIZE", keccak256("root2"));
+    }
+
+    function test_ResolveClaim_RevertOnEmptyHash() public {
+        vm.expectRevert("EvidenceRegistry: empty claim hash");
+        registry.resolveClaim(bytes32(0), true, "OPTIMISTIC_FINALIZE", keccak256("root"));
+    }
+
+    function test_ResolveClaim_RevertOnEmptyMethod() public {
+        vm.expectRevert("EvidenceRegistry: empty method");
+        registry.resolveClaim(keccak256("claim-3"), true, "", keccak256("root"));
+    }
+
+    function test_IsResolved() public {
+        bytes32 claimHash = keccak256("claim-4");
+        assertFalse(registry.isResolved(claimHash));
+        registry.resolveClaim(claimHash, true, "OPTIMISTIC_FINALIZE", keccak256("root"));
+        assertTrue(registry.isResolved(claimHash));
+    }
+
+    function test_Event_EmitsClaimResolved() public {
+        bytes32 claimHash = keccak256("claim-5");
+        bytes32 resRoot = keccak256("resolution-root-5");
+        vm.expectEmit(true, false, false, true);
+        emit EvidenceRegistry.ClaimResolved(claimHash, true, "OPTIMISTIC_FINALIZE", resRoot, block.timestamp, address(this));
+        registry.resolveClaim(claimHash, true, "OPTIMISTIC_FINALIZE", resRoot);
+    }
 }

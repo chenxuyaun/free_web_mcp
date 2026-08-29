@@ -120,7 +120,13 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
 
   const state = mapRow(row);
   state.id = evidenceId;
-  state.evidenceHash = evidenceId;
+
+  // The on-chain anchor uses the real SHA-256 of the evidence package (the
+  // hash column), NOT the display id (e.g. "EV-000012").
+  const ev = db
+    .prepare("SELECT hash FROM evidence WHERE id = ?")
+    .get(evidenceId) as { hash: string } | undefined;
+  state.evidenceHash = ev?.hash ?? evidenceId;
 
   state.attestations = (db
     .prepare(
