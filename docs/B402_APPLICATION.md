@@ -8,9 +8,9 @@
 
 | 项 | 状态 |
 | --- | --- |
-| 申请邮件（binanceconnect@binance.com） | ✅ 2026-08-29 已发送 |
+| 申请邮件（binanceconnect@binance.com，发件邮箱 **yueshewushuang@gmail.com**） | ✅ 2026-08-29 已发送 |
 | RSA 密钥对（deploy/b402/，公钥已随邮件提交） | ✅ |
-| 官方回信（clientId/accessToken） | ⏳ 等待中 |
+| 官方回信（clientId/accessToken） | ⏳ 等待中（回信会进 Gmail，需转发到 yueshen@agent.qq.com 由 Agent 接管） |
 | 开源备胎（自托管 relayer，testnet 已验通） | ✅ 随时可用 |
 
 ## 已尝试的通道
