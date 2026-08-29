@@ -3,9 +3,10 @@
 
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
-RUN corepack enable
+RUN corepack enable && apt-get update && apt-get install --no-install-recommends -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY patches ./patches
 COPY apps/web/package.json apps/web/
 COPY packages/evidence/package.json packages/evidence/
 COPY packages/blockchain/package.json packages/blockchain/
@@ -21,6 +22,7 @@ RUN corepack enable
 ENV NODE_ENV=production
 
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/web/.next ./apps/web/.next
 COPY --from=builder /app/apps/web/package.json ./apps/web/

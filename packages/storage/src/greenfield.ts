@@ -11,6 +11,7 @@
 
 import { Client, VisibilityType, RedundancyType, Long, bytesFromBase64 } from "@bnb-chain/greenfield-js-sdk";
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 type NodeAdapterReedSolomonCtor = new () => {
@@ -18,20 +19,49 @@ type NodeAdapterReedSolomonCtor = new () => {
 };
 
 /** Load the Reed-Solomon node adapter at runtime (webpackIgnore) because its
- *  worker_threads sibling file cannot survive bundling. */
+ *  worker_threads sibling file cannot survive bundling. Tries, in order:
+ *  1. REED_SOLOMON_ADAPTER env (explicit override)
+ *  2. <cwd>/../../packages/storage/node_modules/... (container + local dev layout)
+ *  3. plain import (non-bundled runtimes) */
 async function loadReedSolomon(): Promise<NodeAdapterReedSolomonCtor> {
-  const adapterPath = process.env.REED_SOLOMON_ADAPTER;
-  if (adapterPath) {
-    const mod = (await import(/* webpackIgnore: true */ pathToFileURL(adapterPath).href)) as {
+  const candidates: string[] = [];
+  if (process.env.REED_SOLOMON_ADAPTER) candidates.push(process.env.REED_SOLOMON_ADAPTER);
+  candidates.push(
+    path.resolve(
+      process.cwd(),
+      "..",
+      "..",
+      "packages",
+      "storage",
+      "node_modules",
+      "@bnb-chain",
+      "reed-solomon",
+      "dist",
+      "node.adapter.js",
+    ),
+  );
+
+  let lastError: unknown = null;
+  for (const candidate of candidates) {
+    try {
+      const mod = (await import(
+        /* webpackIgnore: true */ pathToFileURL(candidate).href
+      )) as { NodeAdapterReedSolomon: NodeAdapterReedSolomonCtor };
+      return mod.NodeAdapterReedSolomon;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  try {
+    const mod = (await import("@bnb-chain/reed-solomon/node.adapter")) as unknown as {
       NodeAdapterReedSolomon: NodeAdapterReedSolomonCtor;
     };
     return mod.NodeAdapterReedSolomon;
+  } catch {
+    throw new Error(
+      `Cannot load @bnb-chain/reed-solomon adapter (tried ${candidates.join(", ")}): ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+    );
   }
-  // Non-bundled runtime (tests/CLI): plain import resolves normally.
-  const mod = (await import("@bnb-chain/reed-solomon/node.adapter")) as unknown as {
-    NodeAdapterReedSolomon: NodeAdapterReedSolomonCtor;
-  };
-  return mod.NodeAdapterReedSolomon;
 }
 
 export interface GreenfieldConfig {
