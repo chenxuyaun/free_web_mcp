@@ -76,3 +76,14 @@ details (Free Web MCP — MCP server monetization, testnet wallet
 官方社区入口（需自行确认最新邀请链接）：BNB Chain Discord
 （discord.gg/bnbchain）、Telegram（t.me/bnbchain）、Binance Developers
 （developers.binance.com 上的社区/支持入口）。
+
+## 2026-08-29 补充调研（Binance Agent OS / Agentic Payments）
+
+- **Binance Agent OS 2026-08-20 上线**：打包 Binance API、Wallet Agentic Hub、
+  Binance x402 可编程支付、Skill Hub、MCP 支持（agent.binance.com/mcp/agentic）。
+- **Agentic MCP 端点**：自助接入（OAuth、无 API key、无审批），但是**交易域**
+  （读行情/查余额/交易），与商户支付无关。
+- **Agentic Payments（x402 商户侧）**：文档确认**仍是审批制**——"基于 Binance
+  确认的集成范围"，联系渠道仍是 binanceconnect@binance.com。
+- **结论**：不存在绕过审批的自助商户通道；邮件申请是唯一正确路径，等待回信
+  就是唯一状态。09-03 自动化为双通道监控（邮箱 + issue #28）。
