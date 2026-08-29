@@ -60,7 +60,7 @@ After deployment, judges can connect from:
 2. Sign in to <https://render.com> with GitHub.
 3. **New → Blueprint** → pick this repo → Render reads `render.yaml` and shows both services.
 4. Fill the `sync: false` secrets when prompted:
-   - `EVIDENCE_REGISTRY_ADDRESS` = `0xD4F14929A1694932439DDa1D481aA127f80185D7`
+   - `EVIDENCE_REGISTRY_ADDRESS` = `0x19AB142cA0Aad02BB55ffB6129494926c520c60F`
    - `VERI_TOKEN_ADDRESS` = `0xDDcbC86dE41bB8863a4Acd929E965d0E07A54C76`
    - `WALLET_PRIVATE_KEY` = your **testnet-only** private key (MetaMask export)
 5. Click **Apply**. First build takes 3-5 minutes per service.

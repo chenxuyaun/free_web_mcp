@@ -18,7 +18,7 @@ full independent-verification card.
 | 10 | Evidence Package generated | ✅ | full spec §14 schema incl. provenance + counterEvidence |
 | 11 | SHA-256 generated | ✅ | canonical JSON → 64-hex; same→same / changed→different tests |
 | 12 | Solidity tests pass | ✅ | forge: 15 tests (6 registry + 9 VERI) |
-| 13 | BSC Testnet contract deployed | ✅ | `0xD4F1…85D7` ([BscScan](https://testnet.bscscan.com/address/0xD4F14929A1694932439DDa1D481aA127f80185D7)) |
+| 13 | BSC Testnet contract deployed | ✅ | `0xD4F1…85D7` ([BscScan](https://testnet.bscscan.com/address/0x19AB142cA0Aad02BB55ffB6129494926c520c60F)) |
 | 14 | Evidence can be anchored | ✅ | Anchor API + button; confirmed flow with `{confirm:true}` |
 | 15 | TX hash displayed | ✅ | detail page + [anchor TX](https://testnet.bscscan.com/tx/0xd31f15ca25b5cdf24afa6764d8b9ef00546d4050c4714501a9d1376b4075d668) |
 | 16 | Explorer link works | ✅ | BscScan links throughout detail page + on-chain feed |

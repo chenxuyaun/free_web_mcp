@@ -6,6 +6,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { ExportButton } from "@/components/ExportButton";
 import { Timeline } from "@/components/Timeline";
 import { ValidatorPanel } from "@/components/ValidatorPanel";
+import { ProtocolPanel } from "@/components/ProtocolPanel";
 import { getEvidencePackage } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -163,6 +164,10 @@ export default async function EvidenceDetailPage({
             ))}
           </ul>
         )}
+      </Section>
+
+      <Section title="Verification Protocol (V1)">
+        <ProtocolPanel id={pkg.id} />
       </Section>
 
       <Section title="Validator Vote (spec §25-26)">

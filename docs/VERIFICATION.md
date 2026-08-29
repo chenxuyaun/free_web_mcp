@@ -9,7 +9,7 @@ Open these in any browser:
 
 | Claim | Public proof |
 | --- | --- |
-| EvidenceRegistry contract deployed | <https://testnet.bscscan.com/address/0xD4F14929A1694932439DDa1D481aA127f80185D7> |
+| EvidenceRegistry contract deployed | <https://testnet.bscscan.com/address/0x19AB142cA0Aad02BB55ffB6129494926c520c60F> |
 | Evidence EV-000012 anchored | <https://testnet.bscscan.com/tx/0xd31f15ca25b5cdf24afa6764d8b9ef00546d4050c4714501a9d1376b4075d668> |
 | VERI token v2 (zero-premine, bitcoin-style emission) | <https://testnet.bscscan.com/token/0xDDcbC86dE41bB8863a4Acd929E965d0E07A54C76> |
 | VERI v2 reward mint (100 to validator, supply 0→100) | <https://testnet.bscscan.com/tx/0x9a350a40484ecae61945b730c4df2668e5399026d0538c5368ba8579dcf5051f> |
@@ -34,7 +34,7 @@ Using any EVM client against `https://data-seed-prebsc-1-s1.binance.org:8545`:
 cast chain-id --rpc-url https://data-seed-prebsc-1-s1.binance.org:8545
 
 # the anchored evidence hash exists on the registry
-cast call 0xD4F14929A1694932439DDa1D481aA127f80185D7   "exists(bytes32)(bool)"   0x8a137c429eaae063fe0db8170d681221040c0aa3cc417e84ee3a0d3e8973e579   --rpc-url https://data-seed-prebsc-1-s1.binance.org:8545   # -> true
+cast call 0x19AB142cA0Aad02BB55ffB6129494926c520c60F   "exists(bytes32)(bool)"   0x8a137c429eaae063fe0db8170d681221040c0aa3cc417e84ee3a0d3e8973e579   --rpc-url https://data-seed-prebsc-1-s1.binance.org:8545   # -> true
 
 # agent identity #2006 is owned by the project wallet
 cast call 0x8004A818BFB912233c491871b3d84c89A494BD9e   "ownerOf(uint256)(address)" 2006   --rpc-url https://data-seed-prebsc-1-s1.binance.org:8545

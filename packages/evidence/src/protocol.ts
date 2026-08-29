@@ -172,8 +172,7 @@ export interface CitationEnvelope {
     evidenceHash: string;
     txHash?: string;
     network?: string;
-  };
-}
+  };}
 
 // ---------------------------------------------------------------------------
 // Protocol helpers

@@ -55,7 +55,7 @@ on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 ### Added — Verifiable Web Evidence Network (full stack)
 
 - **Evidence network on BSC Testnet (live)**:
-  - `EvidenceRegistry` deployed at `0xD4F14929A1694932439DDa1D481aA127f80185D7`
+  - `EvidenceRegistry` deployed at `0x19AB142cA0Aad02BB55ffB6129494926c520c60F`
     (verified anchor TX on BscScan).
   - **VERI** BEP-20 reward token at `0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da`
     (100M supply, owner mint for rewards).
