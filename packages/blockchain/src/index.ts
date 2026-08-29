@@ -8,9 +8,17 @@ export {
 export { EvidenceRegistryClient } from "./registry";
 export {
   AgentIdentityClient,
+  ReputationClient,
   ERC8004_IDENTITY_ADDRESS_TESTNET,
   ERC8004_REPUTATION_ADDRESS_TESTNET,
   ERC8004_IDENTITY_ABI,
+  ERC8004_REPUTATION_ABI,
 } from "./agent";
-export type { AgentIdentityConfig, RegisterResult } from "./agent";
+export type {
+  AgentIdentityConfig,
+  RegisterResult,
+  ReputationConfig,
+  FeedbackInput,
+  ReputationSummary,
+} from "./agent";
 export type { AnchorResult, RegistryClientOptions, AnchoredRecord, ListRecordsOptions } from "./registry";

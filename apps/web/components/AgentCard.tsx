@@ -18,7 +18,19 @@ interface RegisterResponse {
   error?: { message?: string };
 }
 
-export function AgentCard({ registration }: { registration: Registration | null }) {
+interface ReputationSummary {
+  count: string;
+  overallValue: string;
+  valueDecimals: number;
+}
+
+export function AgentCard({
+  registration,
+  reputation,
+}: {
+  registration: Registration | null;
+  reputation?: ReputationSummary | null;
+}) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RegisterResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +72,19 @@ export function AgentCard({ registration }: { registration: Registration | null 
             {reg.agentURI} <ExternalLink className="h-3 w-3" />
           </a>
         </div>
-        <p className="mt-3 text-xs text-neutral-500">
-          Spec §28: on-chain identity is the anchor for evidence reputation — validator
-          feedback will attach to this agentId (feedback writing lands with the
-          second-wallet flow).
-        </p>
+        {reputation && Number(reputation.count) > 0 ? (
+          <div className="mt-3 rounded border border-emerald-800 bg-emerald-950/30 p-3 text-xs">
+            <div className="text-emerald-300">
+              ⭐ On-chain reputation: {reputation.overallValue} / {reputation.count} feedback
+              (client-verified, ERC-8004 Reputation Registry)
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-neutral-500">
+            Spec §28: on-chain identity anchors evidence reputation — client feedback
+            lands on this agentId via the Reputation Registry.
+          </p>
+        )}
       </div>
     );
   }

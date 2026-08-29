@@ -70,6 +70,127 @@ export const ERC8004_IDENTITY_ABI = [
   },
 ] as const;
 
+export const ERC8004_REPUTATION_ABI = [
+  {
+    inputs: [
+      { internalType: "uint256", name: "agentId", type: "uint256" },
+      { internalType: "int128", name: "value", type: "int128" },
+      { internalType: "uint8", name: "valueDecimals", type: "uint8" },
+      { internalType: "string", name: "tag1", type: "string" },
+      { internalType: "string", name: "tag2", type: "string" },
+      { internalType: "string", name: "endpoint", type: "string" },
+      { internalType: "string", name: "feedbackURI", type: "string" },
+      { internalType: "bytes32", name: "feedbackHash", type: "bytes32" },
+    ],
+    name: "giveFeedback",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "agentId", type: "uint256" },
+      { internalType: "address[]", name: "clientAddresses", type: "address[]" },
+      { internalType: "string", name: "tag1", type: "string" },
+      { internalType: "string", name: "tag2", type: "string" },
+    ],
+    name: "getSummary",
+    outputs: [
+      { internalType: "uint64", name: "", type: "uint64" },
+      { internalType: "int128", name: "", type: "int128" },
+      { internalType: "uint8", name: "", type: "uint8" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+export interface ReputationConfig {
+  rpcUrl: string;
+  chain: Chain;
+  reputationAddress: Hex;
+  /** Second wallet — the registry blocks agents from feedbacking themselves. */
+  feedbackPrivateKey?: Hex;
+}
+
+export interface FeedbackInput {
+  agentId: bigint;
+  /** 0..100 scale encoded as int128 with 0 decimals. */
+  value: number;
+  tag1?: string;
+  tag2?: string;
+  endpoint?: string;
+  feedbackURI: string;
+  feedbackHash: Hex;
+}
+
+export interface ReputationSummary {
+  count: bigint;
+  overallValue: bigint;
+  valueDecimals: number;
+}
+
+export class ReputationClient {
+  private cfg: ReputationConfig;
+  readonly reputationAddress: Hex;
+
+  constructor(cfg: ReputationConfig) {
+    this.cfg = cfg;
+    this.reputationAddress = cfg.reputationAddress;
+  }
+
+  /** Post client feedback for an agent (must NOT be signed by the agent owner). */
+  async giveFeedback(input: FeedbackInput): Promise<Hex> {
+    if (!this.cfg.feedbackPrivateKey) {
+      throw new Error("No feedback signer configured (FEEDBACK_PRIVATE_KEY).");
+    }
+    const { privateKeyToAccount } = await import("viem/accounts");
+    const account = privateKeyToAccount(this.cfg.feedbackPrivateKey);
+    const wc = createWalletClient({
+      account,
+      chain: this.cfg.chain,
+      transport: http(this.cfg.rpcUrl),
+    });
+    const txHash = await wc.writeContract({
+      address: this.reputationAddress,
+      abi: ERC8004_REPUTATION_ABI,
+      functionName: "giveFeedback",
+      args: [
+        input.agentId,
+        BigInt(input.value),
+        0, // valueDecimals
+        input.tag1 ?? "evidence-verification",
+        input.tag2 ?? "web",
+        input.endpoint ?? "",
+        input.feedbackURI,
+        input.feedbackHash,
+      ],
+      account,
+      chain: this.cfg.chain,
+    });
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    await pc.waitForTransactionReceipt({ hash: txHash });
+    return txHash;
+  }
+
+  /** Aggregate reputation for an agent across the given client wallets. */
+  async getSummary(
+    agentId: bigint,
+    clientAddresses: Hex[],
+    tag1 = "",
+    tag2 = "",
+  ): Promise<ReputationSummary> {
+    const pc = createPublicClient({ chain: this.cfg.chain, transport: http(this.cfg.rpcUrl) });
+    const [count, value, decimals] = await pc.readContract({
+      address: this.reputationAddress,
+      abi: ERC8004_REPUTATION_ABI,
+      functionName: "getSummary",
+      args: [agentId, clientAddresses, tag1, tag2],
+    });
+    return { count, overallValue: value, valueDecimals: decimals };
+  }
+}
+
 export interface AgentIdentityConfig {
   rpcUrl: string;
   chain: Chain;

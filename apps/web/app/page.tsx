@@ -6,7 +6,7 @@ import { HealthCard } from "@/components/HealthCard";
 import { StatusBoard } from "@/components/StatusBoard";
 import { Milestones } from "@/components/Milestones";
 import { StatsGrid } from "@/components/StatsGrid";
-import { getRegisteredAgent } from "@/lib/agent";
+import { getRegisteredAgent, getReputationSummary } from "@/lib/agent";
 import { getStats } from "@/lib/db";
 import { getSystemStatus } from "@/lib/status";
 
@@ -41,7 +41,10 @@ export default async function Home() {
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold mb-4">Agent Identity (ERC-8004)</h2>
-        <AgentCard registration={getRegisteredAgent()} />
+        <AgentCard
+          registration={getRegisteredAgent()}
+          reputation={await getReputationSummary()}
+        />
       </section>
 
       <section className="mt-10">
