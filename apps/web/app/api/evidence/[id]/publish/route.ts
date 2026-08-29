@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canonicalJson } from "@free-web-mcp/evidence";
 import { getGreenfieldPublisher } from "@/lib/greenfield";
-import { getEvidencePackage, markPublished } from "@/lib/db";
+import { getEvidencePackage, getPayloadJson, markPublished } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -45,9 +45,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   try {
-    // The published payload must be byte-identical to what was hashed:
-    // canonicalJson is the same canonicalization the evidence hash used.
-    const json = canonicalJson(pkg);
+    // The published payload must be byte-identical to what was hashed.
+    // New records store the exact canonical JSON at creation; legacy rows
+    // fall back to re-canonicalizing the current package (hash may differ
+    // from the on-chain fingerprint if the package gained anchor metadata).
+    const json = getPayloadJson(params.id) ?? canonicalJson(pkg);
     const result = await publisher.publish(json);
 
     markPublished(params.id, result.uri);

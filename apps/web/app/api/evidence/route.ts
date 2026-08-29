@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   buildEvidencePackage,
+  canonicalJson,
   type ClaimType,
   type EvidenceSource,
 } from "@free-web-mcp/evidence";
@@ -106,6 +107,6 @@ export async function POST(request: Request) {
     crossVerified: body.crossVerified ?? false,
   });
 
-  const saved = insertEvidence({ pkg, hash });
+  const saved = insertEvidence({ pkg, hash, payloadJson: canonicalJson(pkg) });
   return NextResponse.json({ success: true, id: saved.id, hash, package: saved });
 }

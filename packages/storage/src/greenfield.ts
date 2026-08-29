@@ -10,8 +10,29 @@
  */
 
 import { Client, VisibilityType, RedundancyType, Long, bytesFromBase64 } from "@bnb-chain/greenfield-js-sdk";
-import { NodeAdapterReedSolomon } from "@bnb-chain/reed-solomon/node.adapter";
 import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
+
+type NodeAdapterReedSolomonCtor = new () => {
+  encodeInSubWorker(data: Uint8Array): Promise<string[]>;
+};
+
+/** Load the Reed-Solomon node adapter at runtime (webpackIgnore) because its
+ *  worker_threads sibling file cannot survive bundling. */
+async function loadReedSolomon(): Promise<NodeAdapterReedSolomonCtor> {
+  const adapterPath = process.env.REED_SOLOMON_ADAPTER;
+  if (adapterPath) {
+    const mod = (await import(/* webpackIgnore: true */ pathToFileURL(adapterPath).href)) as {
+      NodeAdapterReedSolomon: NodeAdapterReedSolomonCtor;
+    };
+    return mod.NodeAdapterReedSolomon;
+  }
+  // Non-bundled runtime (tests/CLI): plain import resolves normally.
+  const mod = (await import("@bnb-chain/reed-solomon/node.adapter")) as unknown as {
+    NodeAdapterReedSolomon: NodeAdapterReedSolomonCtor;
+  };
+  return mod.NodeAdapterReedSolomon;
+}
 
 export interface GreenfieldConfig {
   rpcUrl: string;
@@ -56,7 +77,29 @@ export class GreenfieldPublisher {
     return `${this.cfg.spEndpoint}/view/${this.cfg.bucket}/${objectName}`;
   }
 
-  /** One-time, idempotent bucket creation (public-read, owner pays). */
+  /** Pick the first SP whose gateway is reachable from this machine.
+   *  PUT writes must go to the bucket's primary SP — if we create the bucket
+   *  on an unreachable SP the payload upload can never succeed. */
+  async pickReachableSp(
+    sps: Array<{ operatorAddress?: string; endpoint?: string }>,
+  ): Promise<{ operatorAddress: string; endpoint: string }> {
+    for (const sp of sps) {
+      if (!sp.endpoint || !sp.operatorAddress) continue;
+      try {
+        await fetch(sp.endpoint, { signal: AbortSignal.timeout(8000) });
+        // Any HTTP response (even 4xx/5xx) means the gateway is reachable.
+        return { operatorAddress: sp.operatorAddress, endpoint: sp.endpoint };
+      } catch {
+        continue;
+      }
+    }
+    throw new Error(
+      "No reachable Greenfield storage provider gateway — check network/VPN and retry.",
+    );
+  }
+
+  /** One-time, idempotent bucket creation (public-read, owner pays).
+   *  Primary SP is chosen by gateway reachability, not list order. */
   async ensureBucket(): Promise<void> {
     if (this.bucketReady) return;
     const addr = this.cfg.accountAddress;
@@ -74,7 +117,7 @@ export class GreenfieldPublisher {
 
     const sps = await this.client.sp.getStorageProviders();
     if (!sps?.length) throw new Error("No Greenfield storage providers found.");
-    const primarySp = sps[0];
+    const primarySp = await this.pickReachableSp(sps);
 
     const tx = await this.client.bucket.createBucket({
       bucketName: this.cfg.bucket,
@@ -105,10 +148,10 @@ export class GreenfieldPublisher {
     const buf = Buffer.from(json, "utf8");
     const addr = this.cfg.accountAddress;
 
-    const checksums = await new NodeAdapterReedSolomon().encodeInWorker(
-      __filename,
-      Uint8Array.from(buf),
-    );
+    // encodeInWorker(p, data) is deprecated (requires a worker script path);
+    // encodeInSubWorker bundles its own worker entry.
+    const RS = await loadReedSolomon();
+    const checksums = await new RS().encodeInSubWorker(Uint8Array.from(buf));
 
     const tx = await this.client.object.createObject({
       bucketName: this.cfg.bucket,
@@ -130,7 +173,9 @@ export class GreenfieldPublisher {
       privateKey: this.cfg.privateKey,
     });
 
-    await this.client.object.uploadObject(
+    // uploadObject/putObject do NOT throw on HTTP failure — they return
+    // {code, message, statusCode}. Surface failures loudly.
+    const upRes = (await this.client.object.uploadObject(
       {
         bucketName: this.cfg.bucket,
         objectName,
@@ -138,12 +183,20 @@ export class GreenfieldPublisher {
         txnHash: res.transactionHash,
       },
       { type: "ECDSA", privateKey: this.cfg.privateKey },
-    );
+    )) as { code?: number; message?: string; statusCode?: number } | undefined;
+
+    if (upRes && typeof upRes === "object" && "code" in upRes && upRes.code !== 0) {
+      throw new Error(
+        `Greenfield payload upload failed: ${upRes.message} (code ${upRes.code}, status ${upRes.statusCode})`,
+      );
+    }
 
     await this.waitSealed(objectName);
 
+    const uri = await this.resolveViewUrl(objectName);
+
     return {
-      uri: this.viewUrl(objectName),
+      uri,
       objectName,
       txHash: res.transactionHash,
       contentHash,
@@ -151,23 +204,41 @@ export class GreenfieldPublisher {
     };
   }
 
-  /** Poll headObject until the SP seals the object (or timeout). */
-  async waitSealed(objectName: string, timeoutMs = 60_000): Promise<void> {
+  /** Poll headObject until the SP seals the object (or timeout).
+   *  Greenfield ObjectStatus: 0 = CREATED, 1 = SEALED. */
+  async waitSealed(objectName: string, timeoutMs = 120_000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       try {
         const head = (await this.client.object.headObject(this.cfg.bucket, objectName)) as {
           objectInfo?: { objectStatus?: string | number };
         };
-        const status = head?.objectInfo?.objectStatus;
-        // ObjectStatus.OBJECT_STATUS_SEALED === 2 per Greenfield types
-        if (status === 2 || status === "OBJECT_STATUS_SEALED") return;
+        const status = Number(head?.objectInfo?.objectStatus ?? 0);
+        if (status === 1) return;
       } catch {
         // not visible yet — keep polling
       }
       await new Promise((r) => setTimeout(r, 3000));
     }
     throw new Error(`Greenfield object ${objectName} not sealed within ${timeoutMs}ms`);
+  }
+
+  /** Resolve the bucket's primary SP public endpoint and rebuild the view URL. */
+  async resolveViewUrl(objectName: string): Promise<string> {
+    try {
+      const head = (await this.client.bucket.headBucket(this.cfg.bucket)) as {
+        bucketInfo?: { primarySpAddress?: string };
+      };
+      const spAddr = head?.bucketInfo?.primarySpAddress;
+      if (spAddr) {
+        const sps = await this.client.sp.getStorageProviders();
+        const sp = sps.find((s: { operatorAddress?: string }) => s.operatorAddress === spAddr);
+        if (sp?.endpoint) return `${sp.endpoint}/view/${this.cfg.bucket}/${objectName}`;
+      }
+    } catch {
+      // fall through to configured endpoint
+    }
+    return this.viewUrl(objectName);
   }
 
   /** Verify a published object is retrievable (public GET, no auth). */

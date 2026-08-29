@@ -108,6 +108,9 @@ export function ensureSchema(db: Db): void {
   if (!evCols.includes("greenfield_uri")) {
     db.exec("ALTER TABLE evidence ADD COLUMN greenfield_uri TEXT");
   }
+  if (!evCols.includes("payload_json")) {
+    db.exec("ALTER TABLE evidence ADD COLUMN payload_json TEXT");
+  }
 }
 
 export function closeDb(dbPath?: string): void {
@@ -136,14 +139,17 @@ export interface InsertInput {
   hash: string;
 }
 
-export function insertEvidence(input: InsertInput, dbPath?: string): EvidencePackage {
+export function insertEvidence(
+  input: InsertInput & { payloadJson?: string },
+  dbPath?: string,
+): EvidencePackage {
   const db = getDb(dbPath);
   const pkg = input.pkg;
   const id = nextId(db);
   const withId: EvidencePackage = { ...pkg, id };
   db.prepare(
-    `INSERT INTO evidence (id, claim_text, claim_type, status, confidence, hash, anchored, package_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO evidence (id, claim_text, claim_type, status, confidence, hash, anchored, package_json, payload_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     withId.claim.text,
@@ -153,9 +159,19 @@ export function insertEvidence(input: InsertInput, dbPath?: string): EvidencePac
     input.hash,
     0,
     JSON.stringify(withId),
+    input.payloadJson ?? JSON.stringify(withId),
     withId.provenance.createdAt,
   );
   return withId;
+}
+
+/** Exact canonical JSON whose sha256 == evidence hash (publish bytes). */
+export function getPayloadJson(id: string, dbPath?: string): string | null {
+  const db = getDb(dbPath);
+  const row = db.prepare("SELECT payload_json FROM evidence WHERE id = ?").get(id) as
+    | { payload_json: string | null }
+    | undefined;
+  return row?.payload_json ?? null;
 }
 
 export function listEvidence(
