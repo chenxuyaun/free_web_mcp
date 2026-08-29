@@ -11,6 +11,11 @@ AI Agent → MCP → Web Search → Web Fetch → Claim Extraction → Evidence 
 
 **Live demo** (local): `pnpm dev` → http://localhost:3000
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/chenxuyaun/free_web_mcp)
+
+**Don't trust this README?** Every on-chain claim has a credential-free public
+proof — see [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
 ---
 
 ## What this project is
