@@ -65,3 +65,9 @@ Python (ruff/mypy/pytest), Node (typecheck/vitest/build) and Playwright e2e.
 - VERI is a testnet token with **zero real-world value**.
 - Evidence claims in the demo dataset are self-authored for demonstration;
   the system verifies *provenance and process*, not the truth of the claim.
+- **Greenfield testnet data is not permanent**: BNB Chain purges testnet
+  buckets older than 3 months (+7 days grace, policy since 2023-12). The
+  published evidence URLs will lapse ~2026-12; the full Evidence Packages
+  remain safe in the SQLite `payload_json` column (daily backups on the
+  server since 2026-08-29). Long-term public proof requires Greenfield
+  mainnet (paid storage) — planned if the project moves past demo stage.

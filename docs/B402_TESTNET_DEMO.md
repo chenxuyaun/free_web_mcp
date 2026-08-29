@@ -78,3 +78,22 @@ TEST_USER_PK=<agent pk> TOKEN_ADDRESS=<mock> RELAYER_ADDRESS=<relayer> \
 
 官方凭据（clientId/accessToken）到位后，产品侧做 `/papi/v2/b402/supported`
 + `/verify` + `/settle` 三件套即可切换，协议语义与本次 spike 一致。
+
+## 2026-08 支付生态调研（Phase P 触发条件重估）
+
+等待官方回音期间调研结论——**触发条件在"标准层"已经成立**，B402 不再是唯一路径：
+
+- **MCP 已为支付改造**：2026-07-28 修订去掉握手/会话头（stateless），官方推荐的
+  x402 接入姿势 = **在 MCP HTTP 网关层用 `PAYMENT-REQUIRED` /
+  `PAYMENT-SIGNATURE` / `PAYMENT-RESPONSE` 三个头**做支付强制——这正是我们
+  Phase P 设计的实现方式，现在有标准可循。
+- **x402 已是 Linux Foundation 治理标准**（2026-04，~40 成员：Google/Visa/
+  Stripe/AWS/Coinbase…），2026 年中累计 169M+ 机器支付；Cloudflare Agents
+  SDK（`withX402`/`paidTool`）、AWS Bedrock AgentCore Payments、Stripe、
+  Coinbase CDP x402 SDK 都已把 "MCP + x402" 做成第一公民。
+- **B402 的角色**：BSC 上 x402 的免 gas 实现（relayer 代付）。官方仍申请制；
+  等凭据或继续自托管 relayer 都行——本次 spike 已验证自托管可行。
+
+结论：产品要上"付费 MCP"，标准路径已成熟（x402 at gateway）；
+BSC 侧选 B402 官方（申请中）还是自托管 relayer（已验通），取决于回信结果。
+
