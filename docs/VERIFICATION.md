@@ -11,8 +11,8 @@ Open these in any browser:
 | --- | --- |
 | EvidenceRegistry contract deployed | <https://testnet.bscscan.com/address/0xD4F14929A1694932439DDa1D481aA127f80185D7> |
 | Evidence EV-000012 anchored | <https://testnet.bscscan.com/tx/0xd31f15ca25b5cdf24afa6764d8b9ef00546d4050c4714501a9d1376b4075d668> |
-| VERI token (100M supply) | <https://testnet.bscscan.com/token/0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da> |
-| VERI reward mint (100 to validator) | <https://testnet.bscscan.com/tx/0xf97c48a0181a17bd87ce23cbf7edbbc20b050a15665413d966f184613fa04577> |
+| VERI token v2 (zero-premine, bitcoin-style emission) | <https://testnet.bscscan.com/token/0xDDcbC86dE41bB8863a4Acd929E965d0E07A54C76> |
+| VERI v2 reward mint (100 to validator, supply 0→100) | <https://testnet.bscscan.com/tx/0x9a350a40484ecae61945b730c4df2668e5399026d0538c5368ba8579dcf5051f> |
 | ERC-8004 agent identity #2006 minted | <https://testnet.bscscan.com/tx/0x5261cbd0844cfebc02b2b8d398e69555b0393fb047951430f5a0c576f68f5738> |
 | Reputation feedback (value 95) written by an independent wallet | <https://testnet.bscscan.com/tx/0x8e2034be4cb94ca7226f291749e176e2714e13de121f49ad4f15a5b9b8277ba1> |
 

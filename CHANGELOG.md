@@ -4,6 +4,19 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] - 2026-08-29
+
+### Changed — VERI v2: bitcoin-style zero-premine emission
+
+- `VERI.sol` no longer takes an `initialSupply`: **totalSupply starts at 0**
+  and grows only through reward minting (validator votes / challenges) —
+  same emission philosophy as Bitcoin block rewards. No coins exist until
+  someone earns them.
+- Redeployed to BSC Testnet at `0xDDcbC86dE41bB8863a4Acd929E965d0E07A54C76`
+  (verified on-chain: supply 0 → reward mint → 100). The old 100M-premine
+  token (`0x4FF843Db…`) is deprecated.
+- 15/15 forge tests green (9 VERI incl. zero-premine assertions + 6 registry).
+
 ## [0.4.1] - 2026-08-29
 
 ### Added — self-hosted public deployment

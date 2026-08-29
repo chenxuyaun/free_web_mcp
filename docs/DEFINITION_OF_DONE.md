@@ -34,7 +34,7 @@ full independent-verification card.
 | BNB Greenfield decentralized publish (§27) | [public evidence JSON](https://gnfd-testnet-sp1.bnbchain.org/view/free-web-mcp-evidence2/8a137c429eaae063fe0db8170d681221040c0aa3cc417e84ee3a0d3e8973e579.json) |
 | ERC-8004 agent identity (§28) | agentId 2006 on official registry ([mint TX](https://testnet.bscscan.com/tx/0x5261cbd0844cfebc02b2b8d398e69555b0393fb047951430f5a0c576f68f5738)) |
 | Reputation feedback loop (§28) | value 95 from independent wallet ([TX](https://testnet.bscscan.com/tx/0x8e2034be4cb94ca7226f291749e176e2714e13de121f49ad4f15a5b9b8277ba1)) |
-| VERI reward token + validator rewards (§24-26) | [token](https://testnet.bscscan.com/token/0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da); correct vote → 100 VERI mint |
+| VERI reward token + validator rewards (§24-26) | [token](https://testnet.bscscan.com/token/0xDDcbC86dE41bB8863a4Acd929E965d0E07A54C76); correct vote → 100 VERI mint |
 | Multi-provider search aggregation | DuckDuckGo + Bing + Baidu fallback, URL dedupe |
 | Playwright e2e + CI (Python/Node/e2e jobs) | [Actions](https://github.com/chenxuyaun/free_web_mcp/actions) — all green |
 

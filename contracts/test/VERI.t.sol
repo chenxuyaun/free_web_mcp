@@ -10,22 +10,24 @@ contract VERITest is Test {
     address internal bob = address(0xB0B);
 
     function setUp() public {
-        veri = new VERI(1_000_000 ether);
+        veri = new VERI();
     }
 
-    function test_InitialSupplyAndName() public view {
+    function test_ZeroPremine() public view {
         assertEq(veri.name(), "Verifiable Evidence");
         assertEq(veri.symbol(), "VERI");
         assertEq(veri.decimals(), 18);
-        assertEq(veri.totalSupply(), 1_000_000 ether);
-        assertEq(veri.balanceOf(address(this)), 1_000_000 ether);
+        // Bitcoin-style: no coins exist until rewards are minted.
+        assertEq(veri.totalSupply(), 0);
+        assertEq(veri.balanceOf(address(this)), 0);
         assertEq(veri.owner(), address(this));
     }
 
     function test_Transfer() public {
+        veri.mint(address(this), 1_000 ether);
         veri.transfer(bob, 100 ether);
         assertEq(veri.balanceOf(bob), 100 ether);
-        assertEq(veri.balanceOf(address(this)), 1_000_000 ether - 100 ether);
+        assertEq(veri.balanceOf(address(this)), 900 ether);
     }
 
     function test_TransferInsufficient_Reverts() public {
@@ -35,6 +37,7 @@ contract VERITest is Test {
     }
 
     function test_ApproveAndTransferFrom() public {
+        veri.mint(address(this), 1_000 ether);
         veri.approve(bob, 50 ether);
         vm.prank(bob);
         assertTrue(veri.transferFrom(address(this), alice, 50 ether));
@@ -45,7 +48,7 @@ contract VERITest is Test {
     function test_MintOnlyOwner() public {
         veri.mint(bob, 500 ether);
         assertEq(veri.balanceOf(bob), 500 ether);
-        assertEq(veri.totalSupply(), 1_000_000 ether + 500 ether);
+        assertEq(veri.totalSupply(), 500 ether);
 
         vm.prank(bob);
         vm.expectRevert("VERI: not owner");
@@ -53,15 +56,17 @@ contract VERITest is Test {
     }
 
     function test_Burn() public {
+        veri.mint(address(this), 1_000 ether);
         veri.burn(100 ether);
-        assertEq(veri.totalSupply(), 1_000_000 ether - 100 ether);
+        assertEq(veri.totalSupply(), 900 ether);
     }
 
     function test_BurnFrom() public {
+        veri.mint(address(this), 1_000 ether);
         veri.approve(bob, 200 ether);
         vm.prank(bob);
         veri.burnFrom(address(this), 200 ether);
-        assertEq(veri.totalSupply(), 1_000_000 ether - 200 ether);
+        assertEq(veri.totalSupply(), 800 ether);
     }
 
     function test_TransferOwnership() public {

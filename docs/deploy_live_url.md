@@ -61,7 +61,7 @@ After deployment, judges can connect from:
 3. **New → Blueprint** → pick this repo → Render reads `render.yaml` and shows both services.
 4. Fill the `sync: false` secrets when prompted:
    - `EVIDENCE_REGISTRY_ADDRESS` = `0xD4F14929A1694932439DDa1D481aA127f80185D7`
-   - `VERI_TOKEN_ADDRESS` = `0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da`
+   - `VERI_TOKEN_ADDRESS` = `0xDDcbC86dE41bB8863a4Acd929E965d0E07A54C76`
    - `WALLET_PRIVATE_KEY` = your **testnet-only** private key (MetaMask export)
 5. Click **Apply**. First build takes 3-5 minutes per service.
 6. After deploy, edit the web service env `MCP_SERVER_URL` to the actual MCP URL

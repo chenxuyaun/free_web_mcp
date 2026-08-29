@@ -5,7 +5,9 @@ pragma solidity ^0.8.24;
 /// @notice Standard BEP-20 (BSC) / ERC-20 compatible token for the Free Web MCP
 ///         evidence network. Testnet only. Used for validator & challenge
 ///         rewards (spec §24-§26). No DEX, no liquidity, no public sale.
-/// @dev Owner (deployer) can mint for rewards and burn.
+/// @dev Bitcoin-style emission: ZERO premine — totalSupply starts at 0 and
+///      grows only through reward minting (owner mints per validator/challenge
+///      reward). No coins exist until someone earns them.
 contract VERI {
     string public constant name = "Verifiable Evidence";
     string public constant symbol = "VERI";
@@ -26,11 +28,9 @@ contract VERI {
         _;
     }
 
-    constructor(uint256 initialSupply) {
+    constructor() {
         owner = msg.sender;
-        if (initialSupply > 0) {
-            _mint(msg.sender, initialSupply);
-        }
+        // No initial supply — all VERI enters circulation via mint() rewards.
     }
 
     // ---------- ERC-20 / BEP-20 core ----------
