@@ -59,3 +59,20 @@ Best regards,
 - 私钥只留在 `deploy/b402/b402_private.pem`（已 gitignore），绝不入邮件/代码/日志
 - 只申请 Sandbox（testnet）；Production 等集成测试通过后再申
 - 等回信期间不阻塞：开源自托管链路已验通，可随时演示
+
+## 社区询问话术（Discord/Telegram 开发者频道）
+
+```text
+Hi! We applied for the B402 / OnchainPay x402 Sandbox (BSC Testnet)
+developer account via binanceconnect@binance.com on 2026-08-29, but
+haven't heard back. The Google Form in the docs is restricted to
+internal org accounts and can't be opened from outside. Is there an
+alternative self-service onboarding path, or the right channel to
+escalate a Sandbox credential request? Happy to provide business
+details (Free Web MCP — MCP server monetization, testnet wallet
+0x60a0Ee9e28b609B740A3588121C7C2B34FE64eF4). Thanks!
+```
+
+官方社区入口（需自行确认最新邀请链接）：BNB Chain Discord
+（discord.gg/bnbchain）、Telegram（t.me/bnbchain）、Binance Developers
+（developers.binance.com 上的社区/支持入口）。
