@@ -27,3 +27,5 @@ Thumbs.db
 apps/web/data/
 .env.local
 test-results/
+deploy/.env
+deploy/web.env

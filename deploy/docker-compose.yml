@@ -1,0 +1,74 @@
+# Free Web MCP — production deployment on your own server
+#
+# Services:
+#   web   — Next.js dashboard + evidence API   (internal :3000)
+#   mcp   — Python MCP server, 8 tools         (internal :8765)
+#   caddy — reverse proxy with automatic HTTPS (public :80/:443)
+#
+# Prereqs (one-time on the server):
+#   curl -fsSL https://get.docker.com | sh
+#   DNS: A record  <your-domain>  ->  <server-IP>
+#   Firewall: open 80 + 443
+#
+# Run:
+#   cp deploy/.env.example deploy/.env   # fill DOMAIN + secrets
+#   docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
+#
+# HTTPS certificates are issued automatically by Caddy (Let's Encrypt).
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BSC_NETWORK: ${BSC_NETWORK:-bsc-testnet}
+      BSC_RPC_URL: ${BSC_RPC_URL:-https://data-seed-prebsc-1-s1.binance.org:8545}
+      BSC_EXPLORER_URL: ${BSC_EXPLORER_URL:-https://testnet.bscscan.com}
+      EVIDENCE_REGISTRY_ADDRESS: ${EVIDENCE_REGISTRY_ADDRESS}
+      VERI_TOKEN_ADDRESS: ${VERI_TOKEN_ADDRESS}
+      WALLET_PRIVATE_KEY: ${WALLET_PRIVATE_KEY}
+      # dashboard -> MCP goes over the internal docker network (no TLS hop)
+      MCP_SERVER_URL: http://mcp:8765
+      REED_SOLOMON_ADAPTER: /app/packages/storage/node_modules/@bnb-chain/reed-solomon/dist/node.adapter.js
+      GREENFIELD_BUCKET: ${GREENFIELD_BUCKET:-}
+      GREENFIELD_RPC: ${GREENFIELD_RPC:-https://gnfd-testnet-fullnode-tendermint-ap.bnbchain.org}
+      GREENFIELD_CHAIN_ID: ${GREENFIELD_CHAIN_ID:-5600}
+      GREENFIELD_SP_ENDPOINT: ${GREENFIELD_SP_ENDPOINT:-https://gnfd-testnet-sp1.bnbchain.org}
+    volumes:
+      # persist SQLite evidence across redeploys
+      - web-data:/app/apps/web/data
+    depends_on:
+      - mcp
+
+  mcp:
+    build:
+      context: ../apps/mcp-server
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      SEARCH_PROVIDER: auto
+      LOG_LEVEL: INFO
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - mcp
+
+volumes:
+  web-data:
+  caddy-data:
+  caddy-config:

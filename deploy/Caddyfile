@@ -1,0 +1,21 @@
+# Caddyfile — automatic HTTPS via Let's Encrypt.
+# DOMAIN comes from deploy/.env (compose env_file / environment).
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	# MCP server: Streamable HTTP transport + health, served from the Python app
+	handle /mcp* {
+		reverse_proxy mcp:8765
+	}
+	handle /health {
+		reverse_proxy mcp:8765
+	}
+
+	# everything else -> Next.js dashboard (its own /api/health included)
+	handle {
+		reverse_proxy web:3000
+	}
+}
