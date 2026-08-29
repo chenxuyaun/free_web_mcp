@@ -20,13 +20,13 @@
 | Google Form（forms.gle/aUQvxUETfGMzyTky5，文档唯一入口） | ❌ 组织限制，外部账号无法打开 |
 | 邮件 binanceconnect@binance.com（文档确认的联系邮箱） | ✅ 已发（唯一可行官方通道） |
 | Vistara-Labs/b402 仓库（开源实现） | ❌ 已归档只读，无联系人 |
-| bnb-chain/mpp-sdk（BNB Chain 官方 SDK） | 无接入指引，可试 GitHub issue |
+| bnb-chain/mpp-sdk（BNB Chain 官方 SDK） | ✅ [issue #28 已开](https://github.com/bnb-chain/mpp-sdk/issues/28)（2026-08-29，提前于原计划） |
 
 ## 跟进计划
 
 - **第 3 个工作日**（约 09-03）：无回信则发跟进邮件（模板见下）
-- **第 7 个工作日**（约 09-09）：跟进邮件 + 在 bnb-chain/mpp-sdk 开 issue
-  询问 Sandbox 接入指引
+- **2026-08-29（提前执行）**：已在 bnb-chain/mpp-sdk 开 [issue #28](https://github.com/bnb-chain/mpp-sdk/issues/28)
+  询问 Sandbox 接入指引（原计划 09-09，为加速获取提前）
 - **并行**：加入 BNB Chain 开发者社区（Discord/Telegram）问 B402 接入，
   社区经理常能加速
 - 任何回信：把 clientId/accessToken 写入服务器 .env，开做支付网关
