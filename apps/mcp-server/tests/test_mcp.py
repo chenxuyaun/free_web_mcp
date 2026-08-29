@@ -21,10 +21,9 @@ def make_ctx(settings: Settings | None = None) -> AppContext:
 
 
 async def call_tool(ctx: AppContext, name: str, arguments: dict[str, object]) -> dict[str, object]:
-    from mcp.shared.memory import create_connected_server_and_client_session as connect
+    from tests.conftest import connect_mcp
 
-    server = create_mcp_server(ctx)
-    async with connect(server._mcp_server) as session:
+    async with connect_mcp(create_mcp_server(ctx)) as session:
         await session.initialize()
         result = await session.call_tool(name, arguments)
         assert len(result.content) == 1, f"unexpected content blocks: {result}"
@@ -32,10 +31,9 @@ async def call_tool(ctx: AppContext, name: str, arguments: dict[str, object]) ->
 
 
 async def test_list_tools() -> None:
-    from mcp.shared.memory import create_connected_server_and_client_session as connect
+    from tests.conftest import connect_mcp
 
-    server = create_mcp_server(make_ctx())
-    async with connect(server._mcp_server) as session:
+    async with connect_mcp(create_mcp_server(make_ctx())) as session:
         await session.initialize()
         listing = await session.list_tools()
         names = [t.name for t in listing.tools]
@@ -92,15 +90,11 @@ async def test_search_and_fetch_mixes_ok_and_failures() -> None:
         type(provider.results[0])(
             title="Good", url="https://ok.example.com/a", snippet="", source="fake"
         ),
-        type(provider.results[0])(
-            title="Bad", url="bad-url-no-scheme", snippet="", source="fake"
-        ),
+        type(provider.results[0])(title="Bad", url="bad-url-no-scheme", snippet="", source="fake"),
     ]
     respx.get("https://ok.example.com/a").respond(200, html=PAGE_HTML)
 
-    payload = await call_tool(
-        ctx, "web_search_and_fetch", {"query": "q", "max_results": 5}
-    )
+    payload = await call_tool(ctx, "web_search_and_fetch", {"query": "q", "max_results": 5})
     assert payload["success"] is True
     assert payload["query"] == "q"
     ok_item, bad_item = payload["items"]

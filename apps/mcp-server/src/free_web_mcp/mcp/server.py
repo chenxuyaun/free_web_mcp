@@ -1,7 +1,6 @@
-"""MCP server factory - one FastMCP instance reused by both transports."""
+"""MCP server factory - one MCPServer instance reused by both transports."""
 
-from mcp.server.fastmcp import FastMCP
-from mcp.server.transport_security import TransportSecuritySettings
+from mcp.server.mcpserver import MCPServer
 
 from free_web_mcp import __version__
 from free_web_mcp.deps import AppContext, get_context
@@ -17,31 +16,23 @@ INSTRUCTIONS = (
 )
 
 
-def create_mcp_server(ctx: AppContext | None = None) -> FastMCP:
-    # Disable DNS-rebinding host validation by default so the server works
-    # behind ngrok, Render, or any reverse proxy without per-deploy allowlists.
-    # The HTTP transport still requires a proper Origin header on POSTs from
-    # browsers (browsers always send one), which is what the spec recommends.
-    #
-    # Note: the MCP 1.x FastMCP API does not accept a server `version=` kwarg.
-    # The `serverInfo.version` reported to clients is therefore the mcp SDK
-    # version. The application version is surfaced through `instructions` and
-    # through the `/.well-known/mcp.json` and `/health` endpoints.
-    server = FastMCP(
+def create_mcp_server(ctx: AppContext | None = None) -> MCPServer:
+    # MCP SDK 2.x (2026-07-28 protocol era): `version` is a first-class kwarg,
+    # so serverInfo.version now reports the app version. transport_security
+    # moved to streamable_http_app() (see free_web_mcp/server.py).
+    server = MCPServer(
         name="free-web-mcp",
+        version=__version__,
         instructions=f"{INSTRUCTIONS} (app version {__version__})",
-        transport_security=TransportSecuritySettings(
-            enable_dns_rebinding_protection=False,
-        ),
     )
     register_tools(server, ctx or get_context())
     return server
 
 
-_mcp_singleton: FastMCP | None = None
+_mcp_singleton: MCPServer | None = None
 
 
-def get_mcp() -> FastMCP:
+def get_mcp() -> MCPServer:
     """Process-wide singleton used by `__main__`."""
     global _mcp_singleton
     if _mcp_singleton is None:

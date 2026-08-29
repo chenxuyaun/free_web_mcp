@@ -117,9 +117,7 @@ class EvidenceApiClient:
 
     def _post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
         try:
-            response = httpx.post(
-                f"{self._base}{path}", json=payload, timeout=self._timeout
-            )
+            response = httpx.post(f"{self._base}{path}", json=payload, timeout=self._timeout)
         except httpx.HTTPError as exc:
             raise ToolError(
                 ErrorCode.FETCH_FAILED,

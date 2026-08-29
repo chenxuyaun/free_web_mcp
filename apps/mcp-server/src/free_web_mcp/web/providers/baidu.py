@@ -74,9 +74,7 @@ class BaiduProvider:
                 ".content-right_8Zs40, [class*='content-right'], .c-abstract, [class*='abstract']"
             )
             snippet = snippet_el.get_text(strip=True) if snippet_el else ""
-            results.append(
-                SearchResult(title=title, url=href, snippet=snippet, source="baidu")
-            )
+            results.append(SearchResult(title=title, url=href, snippet=snippet, source="baidu"))
             if len(results) >= max_results:
                 break
         return results

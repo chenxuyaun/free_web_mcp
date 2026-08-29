@@ -66,9 +66,9 @@ async def test_well_known_tool_schemas_have_descriptions(client: httpx.AsyncClie
         # at least one property has a description
         props = schema.get("properties", {})
         assert props, f"{tool['name']} has no properties"
-        assert any(
-            "description" in v for v in props.values()
-        ), f"{tool['name']} parameters missing descriptions"
+        assert any("description" in v for v in props.values()), (
+            f"{tool['name']} parameters missing descriptions"
+        )
 
 
 async def test_well_known_annotations_mark_read_only_and_open_world(

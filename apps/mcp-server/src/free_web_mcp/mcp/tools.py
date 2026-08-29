@@ -4,7 +4,7 @@ import json
 from typing import Annotated, Any
 
 from bs4 import BeautifulSoup
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -41,12 +41,10 @@ _TERTIARY_DOMAIN_HINTS = (
 _AUTHORITATIVE_TLDS = (".gov", ".edu", ".int", ".mil", ".ac.")
 
 
-# Tool-level annotation presets. readOnlyHint=True because none of these
-# mutate server state; openWorldHint=True because every tool hits the
-# public internet; destructiveHint=False for the same reason.
-READ_OPEN = ToolAnnotations(
-    readOnlyHint=True, openWorldHint=True, destructiveHint=False
-)
+# Tool-level annotation presets. read_only_hint=True because none of these
+# mutate server state; open_world_hint=True because every tool hits the
+# public internet; destructive_hint=False for the same reason.
+READ_OPEN = ToolAnnotations(read_only_hint=True, open_world_hint=True, destructive_hint=False)
 
 
 def _error_payload(exc: Exception) -> dict[str, Any]:
@@ -87,9 +85,7 @@ def _summarize_sources(html: str, base_url: str) -> SourceSummary:
 
     # Authors: meta tags first, then JSON-LD.
     for key in ("author", "DC.creator", "article:author", "twitter:creator"):
-        tag = soup.find("meta", attrs={"name": key}) or soup.find(
-            "meta", attrs={"property": key}
-        )
+        tag = soup.find("meta", attrs={"name": key}) or soup.find("meta", attrs={"property": key})
         if tag and tag.get("content"):
             v = str(tag["content"]).strip()
             if v and v not in authors:
@@ -167,7 +163,7 @@ def _walk_jsonld(node: object, key: str) -> list[object]:
     return out
 
 
-def register_tools(server: FastMCP, ctx: AppContext) -> None:
+def register_tools(server: MCPServer, ctx: AppContext) -> None:
     @server.tool(
         name="web_search",
         title="Web Search",
@@ -351,9 +347,7 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
             return {
                 "success": True,
                 "count": len(claims),
-                "claims": [
-                    {"id": c.id, "text": c.text, "type": c.type} for c in claims
-                ],
+                "claims": [{"id": c.id, "text": c.text, "type": c.type} for c in claims],
             }
         except ToolError as exc:
             return _error_payload(exc)
@@ -436,9 +430,7 @@ def register_tools(server: FastMCP, ctx: AppContext) -> None:
         annotations=READ_OPEN,
     )
     async def get_evidence(
-        evidence_id: Annotated[
-            str, Field(description="Evidence id in the form EV-XXXXXX.")
-        ],
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
     ) -> dict[str, Any]:
         try:
             client = EvidenceApiClient(ctx.settings.evidence_api_url)

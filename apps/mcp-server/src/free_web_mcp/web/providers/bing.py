@@ -48,9 +48,7 @@ class BingProvider:
                 continue
             snippet_el = item.select_one(".b_caption p, .b_lineclamp2, .b_lineclamp3")
             snippet = snippet_el.get_text(strip=True) if snippet_el else ""
-            results.append(
-                SearchResult(title=title, url=href, snippet=snippet, source="bing")
-            )
+            results.append(SearchResult(title=title, url=href, snippet=snippet, source="bing"))
             if len(results) >= max_results:
                 break
         return results

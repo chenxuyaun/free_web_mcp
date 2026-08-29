@@ -118,8 +118,7 @@ async def test_fetch_service_classifies_https_news() -> None:
 # ---- MCP end-to-end -------------------------------------------------------
 
 PAGE_HTML = (
-    "<html><head><title>T</title></head>"
-    "<body><article><p>Body text.</p></article></body></html>"
+    "<html><head><title>T</title></head><body><article><p>Body text.</p></article></body></html>"
 )
 
 
@@ -130,10 +129,9 @@ def make_ctx(settings: Settings | None = None) -> AppContext:
 
 
 async def call_tool(ctx: AppContext, name: str, arguments: dict[str, object]) -> dict[str, object]:
-    from mcp.shared.memory import create_connected_server_and_client_session as connect
+    from tests.conftest import connect_mcp
 
-    server = create_mcp_server(ctx)
-    async with connect(server._mcp_server) as session:
+    async with connect_mcp(create_mcp_server(ctx)) as session:
         await session.initialize()
         result = await session.call_tool(name, arguments)
         assert len(result.content) == 1
@@ -143,9 +141,7 @@ async def call_tool(ctx: AppContext, name: str, arguments: dict[str, object]) ->
 @respx.mock
 async def test_web_fetch_returns_meta_block() -> None:
     respx.get("https://example.com/page").respond(200, html=HTML_WITH_META)
-    payload = await call_tool(
-        make_ctx(), "web_fetch", {"url": "https://example.com/page"}
-    )
+    payload = await call_tool(make_ctx(), "web_fetch", {"url": "https://example.com/page"})
     assert payload["success"] is True
     assert "meta" in payload
     assert payload["meta"]["author"] == "Alice Author"
@@ -238,17 +234,17 @@ async def test_web_summarize_with_sources_primary_when_same_domain() -> None:
 
 
 async def test_web_summarize_with_sources_needs_input() -> None:
-    payload = await call_tool(
-        make_ctx(), "web_summarize_with_sources", {}
-    )
+    payload = await call_tool(make_ctx(), "web_summarize_with_sources", {})
     assert payload["success"] is False
     assert payload["error"]["type"] == "INVALID_URL"
 
 
 async def test_web_summarize_with_sources_max_links_caps() -> None:
-    html = "<html><body>" + "".join(
-        f'<a href="https://other.com/{i}">x{i}</a>' for i in range(40)
-    ) + "</body></html>"
+    html = (
+        "<html><body>"
+        + "".join(f'<a href="https://other.com/{i}">x{i}</a>' for i in range(40))
+        + "</body></html>"
+    )
     payload = await call_tool(
         make_ctx(),
         "web_summarize_with_sources",
