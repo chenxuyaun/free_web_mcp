@@ -70,4 +70,5 @@ Python (ruff/mypy/pytest), Node (typecheck/vitest/build) and Playwright e2e.
   published evidence URLs will lapse ~2026-12; the full Evidence Packages
   remain safe in the SQLite `payload_json` column (daily backups on the
   server since 2026-08-29). Long-term public proof requires Greenfield
-  mainnet (paid storage) — planned if the project moves past demo stage.
+  mainnet — cost is negligible at this scale (~$0.03/GB/month; the whole
+  evidence set is <1 MB), so migration is a decision, not a cost barrier.

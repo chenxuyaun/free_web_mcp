@@ -97,3 +97,17 @@ TEST_USER_PK=<agent pk> TOKEN_ADDRESS=<mock> RELAYER_ADDRESS=<relayer> \
 结论：产品要上"付费 MCP"，标准路径已成熟（x402 at gateway）；
 BSC 侧选 B402 官方（申请中）还是自托管 relayer（已验通），取决于回信结果。
 
+
+## MCP SDK 2.0 迁移备忘（2026-07-28 生态大地震）
+
+MCP Python SDK 于 2026-07-28 发布 **2.0.0 破坏性大版本**（同日 MCP 协议改为
+无状态）：`FastMCP` 改名 `MCPServer`、`mcp.server.fastmcp` 移除、transport
+参数移到 `run()`、新增 `stateless_http=True`；v1 进入维护模式。
+
+- 本项目当前钉在 `mcp>=1.10,<2`（2025-06-18 协议 + 会话握手），**现有客户端
+  （Claude/Cursor）完全兼容，demo 不受影响，现在不升。**
+- 但 x402 支付网关的官方接入姿势（无状态 + `PAYMENT-REQUIRED`/
+  `PAYMENT-SIGNATURE`/`PAYMENT-RESPONSE` 头）是 2.x 时代的能力。
+- **决策：B402 凭据到位、做支付网关时一并升 2.x**。迁移面：FastMCP→MCPServer
+  改名、run() 签名、44+ pytest 适配、mcp 镜像重建。第三方 FastMCP 4.0.0b1
+  （mode="auto" 双时代兼容）可作备选，但官方 SDK 2.x 是主路径。
