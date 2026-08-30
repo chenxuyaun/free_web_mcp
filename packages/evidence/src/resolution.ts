@@ -338,3 +338,70 @@ function consensusResolution(
 export function isTerminal(state: ClaimState): boolean {
   return state === "RESOLVED" || state === "FINAL";
 }
+
+/** Human-expert arbitration of a DISPUTED claim (L4, teacher §21/§33).
+ *  When the AI-validator ladder cannot reach a decisive consensus
+ *  (knife-edge), a human expert adjudicates: they state the outcome and a
+ *  rationale, and the resolution is produced with method HUMAN_ARBITRATION
+ *  and tier L4_HUMAN_EXPERT. Attestations settle against the ruling. */
+export function arbitrateResolution(
+  claim: ClaimResolutionState,
+  ruling: {
+    result: boolean;
+    expert: string; // human expert id / wallet
+    rationale?: string;
+  },
+  config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG,
+  now: string = new Date().toISOString(),
+): ClaimResolutionState {
+  if (claim.state !== "DISPUTED") {
+    throw new Error(`Cannot arbitrate claim in state ${claim.state} — only DISPUTED claims are arbitrable`);
+  }
+
+  const result = ruling.result;
+  const updatedAttestations = claim.attestations.map((att) => {
+    const matches = attestationMatchesResolution(att.decision, result);
+    return {
+      ...att,
+      settledAt: now,
+      slashed: matches === false,
+      reward: matches === true
+        ? (BigInt(att.stake) * BigInt(Math.round(config.attestorRewardFraction * 1_000)) / 1000n).toString()
+        : "0",
+    };
+  });
+
+  const updatedChallenges = claim.challenges.map((ch) => {
+    if (ch.state === "OPEN" || ch.state === "ESCALATED") {
+      const challengerWon = !result;
+      return {
+        ...ch,
+        state: (challengerWon ? "UPHELD" : "REJECTED") as ChallengeState,
+        challengerWon,
+        resolvedAt: now,
+      };
+    }
+    return ch;
+  });
+
+  const resolution: ClaimResolution = {
+    id: `RES-${claim.id}`,
+    claimId: claim.id,
+    result,
+    finalProbability: result ? 1 : 0, // expert ruling is definitive
+    method: "HUMAN_ARBITRATION",
+    tier: "L4_HUMAN_EXPERT",
+    basis: [ruling.expert], // the expert's ruling drives the outcome
+    resolvedAt: now,
+    effectiveVotes: Math.round(computeIndependence(claim.attestations).reduce((sum, v) => sum + v, 0) * 1000) / 1000,
+  };
+
+  return {
+    ...claim,
+    state: "RESOLVED",
+    attestations: updatedAttestations,
+    challenges: updatedChallenges,
+    resolution,
+    updatedAt: now,
+  };
+}

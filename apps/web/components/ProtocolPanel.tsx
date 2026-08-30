@@ -168,6 +168,28 @@ export function ProtocolPanel({ id }: { id: string }) {
     setBusy(null);
   }
 
+  async function arbitrate() {
+    setBusy("arbitrate");
+    setError(null);
+    const res = await fetch(`${BASE_PATH}/api/claims/${id}/arbitrate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        result: decision === "SUPPORTED",
+        expert: agent,
+        rationale: rationale || "Human expert ruling",
+        confirm: true,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok || !body.success) {
+      setError(body.error?.message ?? "Arbitration failed");
+    } else {
+      await refresh();
+    }
+    setBusy(null);
+  }
+
   const deadline = state?.challengeDeadline
     ? new Date(state.challengeDeadline * 1000).toLocaleString()
     : null;
@@ -405,6 +427,57 @@ export function ProtocolPanel({ id }: { id: string }) {
               </div>
             </div>
           ) : null}
+
+          {/* V19: human-expert arbitration — only for DISPUTED claims */}
+          {state.state === "DISPUTED" && (
+            <div className="space-y-3 rounded-md border border-orange-800 bg-orange-950/20 p-3">
+              <div className="text-xs font-semibold text-orange-300">
+                Dispute escalation (L4) — human expert arbitration
+              </div>
+              <div className="text-[11px] text-neutral-500">
+                The AI-validator ladder could not reach a decisive consensus. A human expert
+                may adjudicate the claim; their ruling settles attestations and challenges.
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-neutral-500">
+                  Expert (wallet / eip155:…)
+                  <input
+                    value={agent}
+                    onChange={(e) => setAgent(e.target.value)}
+                    className="mt-1 w-full rounded bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200"
+                  />
+                </label>
+                <label className="text-xs text-neutral-500">
+                  Ruling
+                  <select
+                    value={decision}
+                    onChange={(e) => setDecision(e.target.value as typeof decision)}
+                    className="mt-1 w-full rounded bg-neutral-800 px-2 py-1.5 text-xs text-neutral-200"
+                  >
+                    <option value="SUPPORTED">TRUE — claim holds</option>
+                    <option value="CONTRADICTED">FALSE — claim fails</option>
+                  </select>
+                </label>
+                <label className="col-span-2 text-xs text-neutral-500">
+                  Rationale
+                  <input
+                    value={rationale}
+                    onChange={(e) => setRationale(e.target.value)}
+                    placeholder="Reviewed primary sources…"
+                    className="mt-1 w-full rounded bg-neutral-800 px-2 py-1.5 text-xs text-neutral-200"
+                  />
+                </label>
+              </div>
+              <button
+                onClick={arbitrate}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-1.5 rounded bg-orange-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+              >
+                {busy === "arbitrate" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Swords className="h-3 w-3" />}
+                Arbitrate (L4 ruling)
+              </button>
+            </div>
+          )}
 
           {error && <div className="text-xs text-rose-400">{error}</div>}
         </div>

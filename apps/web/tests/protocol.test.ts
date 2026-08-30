@@ -5,6 +5,7 @@ import path from "node:path";
 import { buildEvidencePackage, sha256, type EvidenceSource, type OptimisticConfig } from "@free-web-mcp/evidence";
 import { closeDb, getDb, getValidatorStats, insertEvidence } from "../lib/db";
 import {
+  arbitrateClaim,
   attestClaim,
   challengeClaim,
   computeResolutionRoot,
@@ -323,6 +324,49 @@ describe("V14 DISPUTED → decisive consensus (SQLite-backed)", () => {
     expect(resolved.resolution?.tier).toBe("L2_AI_VALIDATORS");
     // The escalated challenge settles: challenger lost (outcome TRUE)
     expect(resolved.challenges[0].challengerWon).toBe(false);
+  });
+});
+
+describe("V19 human-expert arbitration (SQLite-backed)", () => {
+  it("expert arbitrates a DISPUTED claim to RESOLVED with HUMAN_ARBITRATION", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // Knife-edge → DISPUTED
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000", model: "claude" }, FAST);
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+    const disputed = finalizeClaim(db, id, FAST);
+    expect(disputed.state).toBe("DISPUTED");
+
+    // Expert rules TRUE
+    const expert = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+    const resolved = arbitrateClaim(db, id, { result: true, expert, rationale: "sources support the claim" });
+    expect(resolved.state).toBe("RESOLVED");
+    expect(resolved.resolution?.method).toBe("HUMAN_ARBITRATION");
+    expect(resolved.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+    expect(resolved.resolution?.result).toBe(true);
+    expect(resolved.resolution?.basis).toEqual([expert]);
+
+    // SUPPORTED right → not slashed; CONTRADICTED wrong → slashed
+    expect(resolved.attestations[0].slashed).toBe(false);
+    expect(resolved.attestations[1].slashed).toBe(true);
+
+    // Round-trip through SQLite
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded?.state).toBe("RESOLVED");
+    expect(reloaded?.resolution?.method).toBe("HUMAN_ARBITRATION");
+    expect(reloaded?.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+  });
+
+  it("cannot arbitrate a non-DISPUTED claim", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+    // OBSERVED — not arbitrable
+    expect(() => arbitrateClaim(db, id, { result: true, expert: "0xdeadbeef" })).toThrow();
   });
 });
 

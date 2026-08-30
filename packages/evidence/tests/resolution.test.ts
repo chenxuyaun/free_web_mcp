@@ -15,6 +15,7 @@ import {
   type Attestation,
 } from "../src/protocol";
 import {
+  arbitrateResolution,
   submitAttestation,
   submitChallenge,
   finalizeResolution,
@@ -646,5 +647,77 @@ describe("V2 independence scoring", () => {
       const p = logitPool([{ p: 0.9, w: -5 }, { p: 0.1, w: 1 }]);
       expect(p).toBeCloseTo(0.1, 5);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V19 Human-expert arbitration (teacher §21/§33, L4)
+// ---------------------------------------------------------------------------
+
+describe("V19 human-expert arbitration", () => {
+  const SHORT_WINDOW: OptimisticConfig = {
+    ...DEFAULT_OPTIMISTIC_CONFIG,
+    challengeWindowSec: 60,
+  };
+
+  function makeDisputedClaim(): ClaimResolutionState {
+    const claim = makeClaim();
+    const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000" });
+    const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000" });
+    const attested = submitAttestation(claim, a1, SHORT_WINDOW);
+    const attested2 = submitAttestation(attested, a2, SHORT_WINDOW);
+    const challenged = submitChallenge(attested2, {
+      id: "chl-1",
+      claimId: "claim-1",
+      challenger: "0xchallenger",
+      bond: "100000000000000000000",
+      state: "OPEN",
+      createdAt: "2026-08-29T02:00:00.000Z",
+    });
+    const later = new Date(Date.now() + 120_000).toISOString();
+    return finalizeResolution(challenged, SHORT_WINDOW, later);
+  }
+
+  it("only DISPUTED claims are arbitrable", () => {
+    const claim = makeClaim();
+    expect(() => arbitrateResolution(claim, { result: true, expert: "0xexpert" }, SHORT_WINDOW)).toThrow();
+  });
+
+  it("expert ruling TRUE resolves with HUMAN_ARBITRATION, slashing the CONTRADICTED attestor", () => {
+    const disputed = makeDisputedClaim();
+    expect(disputed.state).toBe("DISPUTED");
+
+    const resolved = arbitrateResolution(disputed, {
+      result: true,
+      expert: "0xdeadbeef",
+      rationale: "Reviewed the primary sources — the claim holds",
+    }, SHORT_WINDOW);
+
+    expect(resolved.state).toBe("RESOLVED");
+    expect(resolved.resolution?.method).toBe("HUMAN_ARBITRATION");
+    expect(resolved.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+    expect(resolved.resolution?.result).toBe(true);
+    expect(resolved.resolution?.finalProbability).toBe(1);
+    expect(resolved.resolution?.basis).toEqual(["0xdeadbeef"]);
+
+    // SUPPORTED correct → not slashed; CONTRADICTED wrong → slashed
+    expect(resolved.attestations[0].slashed).toBe(false);
+    expect(resolved.attestations[1].slashed).toBe(true);
+    // The challenge settles: challenger claimed FALSE, ruling is TRUE → rejected
+    expect(resolved.challenges[0].challengerWon).toBe(false);
+  });
+
+  it("expert ruling FALSE rewards the challenger (UPHELD)", () => {
+    const disputed = makeDisputedClaim();
+    const resolved = arbitrateResolution(disputed, {
+      result: false,
+      expert: "0xdeadbeef",
+      rationale: "The sources do not support the claim",
+    }, SHORT_WINDOW);
+
+    expect(resolved.resolution?.result).toBe(false);
+    expect(resolved.resolution?.finalProbability).toBe(0);
+    // Challenger claimed FALSE → now upheld
+    expect(resolved.challenges[0].challengerWon).toBe(true);
   });
 });

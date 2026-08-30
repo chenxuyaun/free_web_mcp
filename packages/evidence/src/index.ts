@@ -38,6 +38,7 @@ export {
   type VerificationTier,
 } from "./protocol";
 export {
+  arbitrateResolution,
   submitAttestation,
   submitChallenge,
   finalizeResolution,

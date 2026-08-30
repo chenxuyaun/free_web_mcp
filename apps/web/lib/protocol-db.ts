@@ -7,6 +7,7 @@
 
 import type Database from "better-sqlite3";
 import {
+  arbitrateResolution,
   brierScore,
   canonicalJson,
   finalizeResolution,
@@ -438,6 +439,22 @@ export function challengeClaim(
     createdAt: now,
   };
   return withState(db, evidenceId, (s) => submitChallenge(s, chl, now));
+}
+
+/** Human-expert arbitration of a DISPUTED claim (V19, L4). Only DISPUTED
+ *  claims are arbitrable; the expert's ruling settles attestations and
+ *  challenges, then Brier reputation + challenge bonds are settled. */
+export function arbitrateClaim(
+  db: Db,
+  evidenceId: string,
+  ruling: { result: boolean; expert: string; rationale?: string },
+  config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG,
+): ClaimResolutionState {
+  const now = new Date().toISOString();
+  const state = withState(db, evidenceId, (s) => arbitrateResolution(s, ruling, config, now));
+  settleBrierReputations(db, state);
+  settleChallengeBonds(db, state, config);
+  return state;
 }
 
 export function finalizeClaim(
