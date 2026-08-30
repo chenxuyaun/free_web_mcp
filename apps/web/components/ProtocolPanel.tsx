@@ -20,6 +20,7 @@ interface ClaimStateView {
     policy?: string;
     searchProvider?: string;
     sources?: string[];
+    reputation?: number;
   }>;
   challenges: Array<{
     id: string;
@@ -235,6 +236,11 @@ export function ProtocolPanel({ id }: { id: string }) {
                       <span className="text-neutral-500">{Number(a.stake) / 1e18} VERI</span>
                       {a.model && <span className="text-neutral-500">{a.model}</span>}
                       {a.searchProvider && <span className="text-neutral-500">{a.searchProvider}</span>}
+                      {a.reputation !== undefined && (
+                        <span className={`${a.reputation >= 0.5 ? "text-sky-400" : "text-neutral-500"}`}>
+                          rep {a.reputation.toFixed(2)}
+                        </span>
+                      )}
                       {a.slashed === true && (
                         <span className="text-rose-400">SLASHED</span>
                       )}

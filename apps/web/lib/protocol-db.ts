@@ -48,6 +48,7 @@ export function ensureProtocolSchema(db: Db): void {
       policy          TEXT,
       search_provider TEXT,
       sources         TEXT,
+      reputation      REAL,
       created_at      TEXT NOT NULL,
       settled_at      TEXT,
       slashed         INTEGER,
@@ -98,6 +99,9 @@ export function ensureProtocolSchema(db: Db): void {
   }
   if (!attCols.some((c) => c.name === "sources")) {
     db.exec("ALTER TABLE attestations ADD COLUMN sources TEXT");
+  }
+  if (!attCols.some((c) => c.name === "reputation")) {
+    db.exec("ALTER TABLE attestations ADD COLUMN reputation REAL");
   }
 }
 
@@ -167,6 +171,7 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
     policy: a.policy ? String(a.policy) : undefined,
     searchProvider: a.search_provider ? String(a.search_provider) : undefined,
     sources: a.sources ? (JSON.parse(String(a.sources)) as string[]) : undefined,
+    reputation: a.reputation === null || a.reputation === undefined ? undefined : Number(a.reputation),
     createdAt: String(a.created_at),
     settledAt: a.settled_at ? String(a.settled_at) : undefined,
     slashed: a.slashed === null ? undefined : Boolean(a.slashed),
@@ -250,9 +255,9 @@ function saveState(db: Db, state: ClaimResolutionState): void {
   const upsertAtt = db.prepare(
     `INSERT OR REPLACE INTO attestations
        (id, evidence_id, agent, decision, confidence, stake, rationale, model,
-        policy, search_provider, sources,
+        policy, search_provider, sources, reputation,
         created_at, settled_at, slashed, reward)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const a of state.attestations) {
     upsertAtt.run(
@@ -267,6 +272,7 @@ function saveState(db: Db, state: ClaimResolutionState): void {
       a.policy ?? null,
       a.searchProvider ?? null,
       a.sources ? JSON.stringify(a.sources) : null,
+      a.reputation ?? null,
       a.createdAt,
       a.settledAt ?? null,
       a.slashed === undefined ? null : a.slashed ? 1 : 0,
@@ -347,11 +353,19 @@ export function attestClaim(
   config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG,
 ): ClaimResolutionState {
   const now = new Date().toISOString();
+  // Snapshot the validator's current reputation (running average of 1−Brier,
+  // teacher §9-§10) so the consensus engine can weight by reputation.
+  const repRow = db
+    .prepare("SELECT reputation FROM validators WHERE address = ?")
+    .get(input.agent.toLowerCase()) as { reputation: number } | undefined;
+  const reputation = repRow?.reputation ?? 0;
+
   const att: Attestation = {
     ...input,
     id: protocolId("ATT"),
     claimId: evidenceId,
     createdAt: now,
+    reputation,
   };
   return withState(db, evidenceId, (s) => submitAttestation(s, att, config, now));
 }

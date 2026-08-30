@@ -82,6 +82,11 @@ export interface Attestation {
   /** Source pages this validator actually read (teacher §13: same web page
    *  → same information pipeline). URL list, deduplicated. */
   sources?: string[];
+  /** Validator's reputation snapshot at attestation time (teacher §9-§10):
+   *  running average of (1 − Brier), 0..1 — 1.0 = perfectly calibrated.
+   *  Captured BEFORE this bet settles, so it reflects the historical
+   *  track record that this judgment is staked on. */
+  reputation?: number;
   createdAt: string; // ISO-8601
   /** Set when this attestation settles. */
   settledAt?: string;

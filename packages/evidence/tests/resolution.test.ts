@@ -405,4 +405,98 @@ describe("V2 independence scoring", () => {
       expect(resolved.resolution?.effectiveVotes).toBeCloseTo(3.0, 1);
     });
   });
+
+  describe("V3 reputation-weighted consensus (teacher §9-§10)", () => {
+    const SHORT_WINDOW: OptimisticConfig = {
+      ...DEFAULT_OPTIMISTIC_CONFIG,
+      challengeWindowSec: 60,
+    };
+
+    it("high-reputation validator's vote outweighs equal-stake newcomers", () => {
+      // Three diverse validators, equal stake, all fully independent:
+      //   ag1 SUPPORTED 0.9, reputation 0.99 (well-calibrated history)
+      //   ag2 SUPPORTED 0.6, reputation 0 (newcomer)
+      //   ag3 CONTRADICTED 0.4, reputation 0 (newcomer)
+      // Plain stake weighting: (0.9 + 0.6 + 0.4)/3 ≈ 0.633 → TRUE
+      // With (1+reputation): (0.9×1.99 + 0.6×1 + 0.4×1)/(1.99+1+1)
+      //   = (1.791 + 1.0) / 3.99 ≈ 0.700 → TRUE (same direction, more confident)
+      const claim = makeClaim();
+      const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", reputation: 0.99 });
+      const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "SUPPORTED", confidence: 0.6, stake: "100000000000000000000", reputation: 0 });
+      const a3 = makeAttestation({ id: "att-3", agent: "ag3", model: "gemini", decision: "CONTRADICTED", confidence: 0.4, stake: "100000000000000000000", reputation: 0 });
+
+      const attested = submitAttestation(claim, a1, SHORT_WINDOW);
+      const attested2 = submitAttestation(attested, a2, SHORT_WINDOW);
+      const attested3 = submitAttestation(attested2, a3, SHORT_WINDOW);
+
+      const challenged = submitChallenge(attested3, {
+        id: "chl-1",
+        claimId: "claim-1",
+        challenger: "0xchallenger",
+        bond: "100000000000000000000",
+        state: "OPEN",
+        createdAt: "2026-08-29T02:00:00.000Z",
+      });
+
+      const later = new Date(Date.now() + 120_000).toISOString();
+      const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
+
+      expect(resolved.resolution?.method).toBe("CONSENSUS_VOTE");
+      expect(resolved.resolution?.result).toBe(true);
+      // (0.9×1.99 + 0.6 + 0.4) / 3.99 ≈ 0.700
+      expect(resolved.resolution?.finalProbability).toBeCloseTo(0.700, 2);
+    });
+
+    it("reputation can flip the outcome when the calibrated expert disagrees", () => {
+      // ag1 SUPPORTED 0.6 rep 0, ag2 SUPPORTED 0.55 rep 0, ag3 CONTRADICTED 0.4 rep 0.99
+      // Plain: (0.6+0.55+0.4)/3 ≈ 0.517 → TRUE
+      // With rep: (0.6 + 0.55 + 0.4×1.99)/(1+1+1.99) = (1.15+0.796)/3.99 ≈ 0.488 → FALSE
+      const claim = makeClaim();
+      const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.6, stake: "100000000000000000000", reputation: 0 });
+      const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "SUPPORTED", confidence: 0.55, stake: "100000000000000000000", reputation: 0 });
+      const a3 = makeAttestation({ id: "att-3", agent: "ag3", model: "gemini", decision: "CONTRADICTED", confidence: 0.4, stake: "100000000000000000000", reputation: 0.99 });
+
+      const attested = submitAttestation(claim, a1, SHORT_WINDOW);
+      const attested2 = submitAttestation(attested, a2, SHORT_WINDOW);
+      const attested3 = submitAttestation(attested2, a3, SHORT_WINDOW);
+
+      const challenged = submitChallenge(attested3, {
+        id: "chl-1",
+        claimId: "claim-1",
+        challenger: "0xchallenger",
+        bond: "100000000000000000000",
+        state: "OPEN",
+        createdAt: "2026-08-29T02:00:00.000Z",
+      });
+
+      const later = new Date(Date.now() + 120_000).toISOString();
+      const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
+
+      expect(resolved.resolution?.result).toBe(false);
+      expect(resolved.resolution?.finalProbability).toBeCloseTo(0.488, 2);
+    });
+
+    it("reputation is clamped to [0,1] (no weight amplification exploit)", () => {
+      const claim = makeClaim();
+      const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", reputation: 5 });
+      const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000", reputation: -3 });
+
+      const attested = submitAttestation(claim, a1, SHORT_WINDOW);
+      const attested2 = submitAttestation(attested, a2, SHORT_WINDOW);
+      const challenged = submitChallenge(attested2, {
+        id: "chl-1",
+        claimId: "claim-1",
+        challenger: "0xchallenger",
+        bond: "100000000000000000000",
+        state: "OPEN",
+        createdAt: "2026-08-29T02:00:00.000Z",
+      });
+      const later = new Date(Date.now() + 120_000).toISOString();
+      const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
+
+      // clamped: a1 factor 2.0, a2 factor 1.0 → (0.9×2 + 0.1×1)/3 = 0.633 → TRUE
+      expect(resolved.resolution?.result).toBe(true);
+      expect(resolved.resolution?.finalProbability).toBeCloseTo(0.633, 3);
+    });
+  });
 });

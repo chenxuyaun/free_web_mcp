@@ -4,6 +4,26 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.3] - 2026-08-30
+
+### Added — V3 reputation-weighted consensus (teacher §9-§10 + §12-§13 closed loop)
+
+- `Attestation.reputation` — the validator's running average of (1 − Brier)
+  captured as a snapshot at attestation time (before this bet settles), so a
+  well-calibrated expert's voice is weighted higher than a newcomer's.
+- Consensus influence is now **stake × independence × (1 + reputation)**;
+  reputation is clamped to [0,1] so no weight-amplification exploit. A
+  perfectly calibrated validator (rep 1.0) carries 2× a brand-new one.
+- `attestClaim` reads the validator's current reputation from the validators
+  table and stamps it on the attestation; DB schema + migration add the
+  `reputation` column; the finalize resolution root now includes model /
+  searchProvider / sources / reputation so the weighted outcome is
+  recomputable.
+- Dashboard shows a `rep X.XX` badge per attestation.
+- New tests: 3 evidence consensus cases (expert outweighs, expert flips the
+  outcome, clamp prevents exploits) + 1 web round-trip test (49→52 evidence,
+  13→14 web; 74 total).
+
 ## [0.5.2] - 2026-08-30
 
 ### Added — full four-dimension independence correlation (teacher §13)

@@ -180,4 +180,26 @@ describe("V2 independence-weighted consensus (SQLite-backed)", () => {
     expect(a1.sources).toEqual(["https://a.com"]);
     expect(a3.searchProvider).toBe("exa");
   });
+
+  it("snapshots validator reputation at attest time and persists it", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // First: build reputation for 0xrep via a resolved claim (Brier settle)
+    // Simpler: directly seed a validator row with a known reputation.
+    const agent = "0x6000000000000000000000000000000000000000";
+    db.prepare(
+      `INSERT INTO validators (address, reputation, verified_claims, successful_challenges, total_votes, created_at)
+       VALUES (?, ?, 5, 1, 6, ?)`,
+    ).run(agent, 0.97, new Date().toISOString());
+
+    // Attest — the engine should snapshot reputation=0.97 on the attestation
+    const state = attestClaim(db, id, { agent, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    expect(state.attestations[0].reputation).toBeCloseTo(0.97, 5);
+
+    // Persist + reload round-trip
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded!.attestations[0].reputation).toBeCloseTo(0.97, 5);
+  });
 });

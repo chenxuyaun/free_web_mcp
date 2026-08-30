@@ -205,8 +205,13 @@ function consensusResolution(
   for (let i = 0; i < claim.attestations.length; i++) {
     const att = claim.attestations[i];
     const ind = independence[i];
-    // influence = stake × independence (in fixed point)
-    const weight = (BigInt(att.stake) * BigInt(Math.round(ind * 1_000_000))) / IND_SCALE;
+    // V3 (teacher §9-§10): calibrated validators get more influence.
+    // reputation ∈ [0,1] (running average of 1−Brier), so a perfect
+    // validator carries 2× a brand-new one; missing reputation = 0 (neutral).
+    const rep = att.reputation ?? 0;
+    const repFactor = 1_000_000n + BigInt(Math.round(Math.min(1, Math.max(0, rep)) * 1_000_000));
+    // influence = stake × independence × (1 + reputation), all in fixed point
+    const weight = (BigInt(att.stake) * BigInt(Math.round(ind * 1_000_000)) / IND_SCALE) * repFactor / IND_SCALE;
     const scaled = BigInt(Math.round(att.confidence * 1_000_000));
     weightedSum += weight * scaled;
     totalWeight += weight;

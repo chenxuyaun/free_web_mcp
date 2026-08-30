@@ -55,6 +55,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
           decision: a.decision,
           confidence: a.confidence,
           stake: a.stake,
+          model: a.model ?? null,
+          searchProvider: a.searchProvider ?? null,
+          sources: a.sources ?? null,
+          reputation: a.reputation ?? null,
           slashed: a.slashed ?? false,
         })),
         challenges: state.challenges.map((c) => ({
