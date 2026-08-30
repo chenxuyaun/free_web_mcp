@@ -38,11 +38,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const rule: ScoringRule = body.scoringRule === "log" ? "log" : "brier";
     const state = finalizeClaim(db, params.id, undefined, rule);
     const res = state.resolution;
+
+    // V14: a knife-edge dispute stays DISPUTED (no resolution) so more
+    // independent validators can weigh in — this is a valid outcome, not
+    // an error. No anchoring (nothing final to anchor).
     if (!res) {
-      return NextResponse.json(
-        { success: false, error: { type: "RENDER_FAILED", message: "No resolution produced." } },
-        { status: 409 },
-      );
+      return NextResponse.json({
+        success: true,
+        state: {
+          id: state.id,
+          state: state.state, // "DISPUTED"
+          resolution: null,
+          anchored: false,
+          escalated: true,
+          escalation: state.challenges.some((c) => c.state === "ESCALATED")
+            ? "PREDICTION_MARKET"
+            : null,
+        },
+      });
     }
 
     let txHash: string | null = null;

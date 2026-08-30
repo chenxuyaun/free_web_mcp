@@ -453,11 +453,11 @@ describe("V2 independence scoring", () => {
       expect(resolved.resolution?.finalProbability).toBeCloseTo(0.700, 2);
     });
 
-    it("reputation weighting pushes a near-knife consensus to INDETERMINATE escalation", () => {
+    it("reputation weighting pushes a near-knife consensus to DISPUTED (V14)", () => {
       // ag1 SUPPORTED 0.6 rep 0, ag2 SUPPORTED 0.55 rep 0, ag3 CONTRADICTED 0.4 rep 0.99
       // With rep: (0.6 + 0.55 + 0.4×1.99)/(1+1+1.99) ≈ 0.488 → knife-edge.
-      // V13: a knife-edge dispute is NOT a coin-flip — it escalates to
-      // HUMAN_ARBITRATION and resolves INDETERMINATE (no slash).
+      // V14: knife-edge does NOT resolve — the claim stays DISPUTED, no one
+      // is slashed/rewarded, and the challenge is ESCALATED (bond held).
       const claim = makeClaim();
       const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.6, stake: "100000000000000000000", reputation: 0 });
       const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "SUPPORTED", confidence: 0.55, stake: "100000000000000000000", reputation: 0 });
@@ -479,14 +479,13 @@ describe("V2 independence scoring", () => {
       const later = new Date(Date.now() + 120_000).toISOString();
       const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
 
-      expect(resolved.resolution?.result).toBe(null);
-      expect(resolved.resolution?.method).toBe("HUMAN_ARBITRATION");
-      expect(resolved.resolution?.tier).toBe("L4_HUMAN_EXPERT");
-      expect(resolved.resolution?.finalProbability).toBeCloseTo(0.488, 2);
-      // No one is slashed or rewarded on an indeterminate outcome
+      expect(resolved.state).toBe("DISPUTED");
+      expect(resolved.resolution).toBeNull();
+      expect(resolved.challenges[0].state).toBe("ESCALATED");
+      // No one is settled, slashed or rewarded while the dispute is open
       for (const att of resolved.attestations) {
-        expect(att.slashed).toBe(false);
-        expect(att.reward).toBe("0");
+        expect(att.settledAt).toBeUndefined();
+        expect(att.slashed).toBeUndefined();
       }
     });
 
@@ -546,7 +545,7 @@ describe("V2 independence scoring", () => {
       expect(determineResolutionTier(challengedClaim, 0.47, "CONSENSUS_VOTE")).toBe("L4_HUMAN_EXPERT");
     });
 
-    it("consensus resolution records the escalated tier on the claim", () => {
+    it("knife-edge consensus stays DISPUTED (does not manufacture a resolution)", () => {
       const claim = makeClaim();
       const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000" });
       const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000" });
@@ -562,10 +561,26 @@ describe("V2 independence scoring", () => {
         createdAt: "2026-08-29T02:00:00.000Z",
       });
       const later = new Date(Date.now() + 120_000).toISOString();
-      const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
+      const disputed = finalizeResolution(challenged, SHORT_WINDOW, later);
 
-      // Knife-edge consensus → escalated to L4 (human expert needed)
-      expect(resolved.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+      // Knife-edge → DISPUTED, no resolution recorded
+      expect(disputed.state).toBe("DISPUTED");
+      expect(disputed.resolution).toBeNull();
+      expect(disputed.challenges[0].state).toBe("ESCALATED");
+
+      // V14: the dispute is not final — a new independent validator can
+      // attest and break the knife-edge decisively.
+      const a3 = makeAttestation({ id: "att-3", agent: "ag3", model: "gemini", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" });
+      const reattested = submitAttestation(disputed, a3, SHORT_WINDOW);
+      const later2 = new Date(Date.now() + 240_000).toISOString();
+      const resolved = finalizeResolution(reattested, SHORT_WINDOW, later2);
+
+      expect(resolved.state).toBe("RESOLVED");
+      expect(resolved.resolution?.result).toBe(true);
+      expect(resolved.resolution?.method).toBe("CONSENSUS_VOTE");
+      expect(resolved.resolution?.tier).toBe("L2_AI_VALIDATORS");
+      // The challenge finally settles: challenger lost (outcome TRUE)
+      expect(resolved.challenges[0].challengerWon).toBe(false);
     });
 
     it("optimistic finalize without challenge stays L2", () => {

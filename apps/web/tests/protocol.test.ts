@@ -169,9 +169,11 @@ describe("V2 independence-weighted consensus (SQLite-backed)", () => {
 
     // Three agents share searchProvider but read disjoint pages: correlation
     // from provider = 0.5 each → independence 0.5 each → effective 1.5.
+    // exa gets a bigger stake so the consensus is decisive (not knife-edge
+    // 0.5, which would stay DISPUTED under V14): weighted p ≈ 0.3 → FALSE.
     attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", searchProvider: "bing", sources: ["https://a.com"] }, FAST);
     attestClaim(db, id, { agent: "0xbbb", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", searchProvider: "bing", sources: ["https://b.com"] }, FAST);
-    attestClaim(db, id, { agent: "0xccc", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000", searchProvider: "exa", sources: ["https://c.com"] }, FAST);
+    attestClaim(db, id, { agent: "0xccc", decision: "CONTRADICTED", confidence: 0.1, stake: "300000000000000000000", searchProvider: "exa", sources: ["https://c.com"] }, FAST);
 
     challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
     await new Promise((r) => setTimeout(r, 1100));
@@ -210,24 +212,28 @@ describe("V2 independence-weighted consensus (SQLite-backed)", () => {
     expect(reloaded!.attestations[0].reputation).toBeCloseTo(0.97, 5);
   });
 
-  it("persists the escalated oracle-ladder tier on the resolution", async () => {
+  it("knife-edge consensus stays DISPUTED with ESCALATED challenge", async () => {
     const dbPath = makeDbPath();
     const id = makeEvidence(dbPath);
     const db = getDb(dbPath);
 
-    // Knife-edge consensus (0.52 vs 0.48, equal stakes) → L4_HUMAN_EXPERT
-    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000" }, FAST);
-    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000" }, FAST);
+    // Knife-edge (0.52 vs 0.48, equal stakes) → V14: DISPUTED, not resolved
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000", model: "claude" }, FAST);
 
     challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
     await new Promise((r) => setTimeout(r, 1100));
 
     const state = finalizeClaim(db, id, FAST);
-    expect(state.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+    expect(state.state).toBe("DISPUTED");
+    expect(state.resolution).toBeNull();
+    expect(state.challenges[0].state).toBe("ESCALATED");
 
     // Round-trip through SQLite
     const reloaded = loadClaimState(db, id);
-    expect(reloaded?.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+    expect(reloaded?.state).toBe("DISPUTED");
+    expect(reloaded?.resolution).toBeNull();
+    expect(reloaded?.challenges[0].state).toBe("ESCALATED");
   });
 });
 
@@ -290,6 +296,35 @@ describe("V6 challenge bond settlement (SQLite-backed)", () => {
   });
 });
 
+describe("V14 DISPUTED → decisive consensus (SQLite-backed)", () => {
+  it("knife-edge stays DISPUTED, then a new independent validator breaks it", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // Two diverse agents at knife-edge (0.52 vs 0.48, equal stakes)
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000", model: "claude" }, FAST);
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    // First finalize → DISPUTED (V14)
+    const disputed = finalizeClaim(db, id, FAST);
+    expect(disputed.state).toBe("DISPUTED");
+    expect(disputed.resolution).toBeNull();
+
+    // New independent validator attests decisively → RESOLVED
+    attestClaim(db, id, { agent: "0xccc", decision: "SUPPORTED", confidence: 0.95, stake: "100000000000000000000", model: "gemini" }, FAST);
+    const resolved = finalizeClaim(db, id, FAST);
+    expect(resolved.state).toBe("RESOLVED");
+    expect(resolved.resolution?.result).toBe(true);
+    expect(resolved.resolution?.method).toBe("CONSENSUS_VOTE");
+    expect(resolved.resolution?.tier).toBe("L2_AI_VALIDATORS");
+    // The escalated challenge settles: challenger lost (outcome TRUE)
+    expect(resolved.challenges[0].challengerWon).toBe(false);
+  });
+});
+
 describe("V7 resolution-root verification (recomputable root)", () => {
   it("computeResolutionRoot is deterministic and stable across reloads", async () => {
     const dbPath = makeDbPath();
@@ -297,7 +332,7 @@ describe("V7 resolution-root verification (recomputable root)", () => {
     const db = getDb(dbPath);
 
     attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
-    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000", model: "claude" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.3, stake: "100000000000000000000", model: "claude" }, FAST);
     challengeClaim(db, id, { challenger: "0xchallenger", bond: "100", reason: "dispute" });
     await new Promise((r) => setTimeout(r, 1100));
 

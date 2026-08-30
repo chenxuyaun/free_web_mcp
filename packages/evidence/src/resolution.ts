@@ -73,14 +73,16 @@ export interface ClaimResolutionState {
 
 /** Submit an attestation (validator judgment with stake).
  *  The first attestation transitions the claim from OBSERVED to SUPPORTED and
- *  starts the challenge window. */
+ *  starts the challenge window. A DISPUTED claim may keep accepting
+ *  attestations (V14): the dispute is not final until a decisive consensus
+ *  appears, so more independent validators can weigh in. */
 export function submitAttestation(
   claim: ClaimResolutionState,
   attestation: Attestation,
   config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG,
   now: string = new Date().toISOString(),
 ): ClaimResolutionState {
-  if (claim.state !== "OBSERVED" && claim.state !== "SUPPORTED") {
+  if (claim.state !== "OBSERVED" && claim.state !== "SUPPORTED" && claim.state !== "DISPUTED") {
     throw new Error(
       `Cannot attest claim in state ${claim.state}`,
     );
@@ -128,11 +130,11 @@ export function submitChallenge(
 }
 
 /** Finalize the claim and produce a resolution.
- *  Handles three cases:
- *  1. No challenge → OPTIMISTIC_FINALIZE: the first attestation wins.
- *  2. Challenge(s) exist → CONSENSUS_VOTE: weigh attestations by stake.
- *  3. Challenge window hasn't passed yet → throws (must wait).
- */
+ *  Handles:
+ *  1. SUPPORTED + window closed → OPTIMISTIC_FINALIZE (no challenge).
+ *  2. CHALLENGED → consensus vote; knife-edge → DISPUTED (V14).
+ *  3. DISPUTED → re-run consensus; if still knife-edge stays DISPUTED,
+ *     else resolves. */
 export function finalizeResolution(
   claim: ClaimResolutionState,
   config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG,
@@ -143,12 +145,10 @@ export function finalizeResolution(
     if (timestamp < claim.challengeDeadline) {
       throw new Error("Challenge window has not closed yet");
     }
-    // No challenge — optimistic finalize
     return optimisticFinalize(claim, now);
   }
 
-  if (claim.state === "CHALLENGED") {
-    // Resolve via consensus weighted by stake
+  if (claim.state === "CHALLENGED" || claim.state === "DISPUTED") {
     return consensusResolution(claim, config, now);
   }
 
@@ -252,7 +252,9 @@ function consensusResolution(
   });
 
   const updatedChallenges = claim.challenges.map((ch) => {
-    if (ch.state === "OPEN") {
+    // OPEN (first dispute) and ESCALATED (a re-finalize of a DISPUTED claim)
+    // both settle once the consensus is decisive.
+    if (ch.state === "OPEN" || (ch.state === "ESCALATED" && !escalated)) {
       if (escalated) {
         // Dispute too sharp for this layer — escalate; bond stays held.
         return {
@@ -284,6 +286,24 @@ function consensusResolution(
     resolvedAt: now,
     effectiveVotes: Math.round(effectiveVotes * 1000) / 1000, // Σ independence
   };
+
+  // V14: a knife-edge dispute is NOT a terminal resolution. The claim stays
+  // DISPUTED (no resolution recorded) so more independent validators can
+  // attest and a decisive consensus can emerge — "higher tier = higher cost,
+  // higher finality" (teacher §21/§33). Attestations remain UNSETTLED (still
+  // in play for the next round); challenges are marked ESCALATED (bond held).
+  if (escalated) {
+    return {
+      ...claim,
+      state: "DISPUTED",
+      attestations: claim.attestations, // unchanged — not settled yet
+      challenges: claim.challenges.map((ch) =>
+        ch.state === "OPEN" ? { ...ch, state: "ESCALATED" as ChallengeState, resolvedAt: now } : ch,
+      ),
+      resolution: null,
+      updatedAt: now,
+    };
+  }
 
   return {
     ...claim,

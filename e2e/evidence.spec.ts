@@ -91,6 +91,7 @@ test("protocol lifecycle: attest → challenge → finalize → RESOLVED (API + 
   const ts = Date.now().toString(36);
   const agentA = `0xaaa00000000000000000000000000000000000${ts}`;
   const agentB = `0xbbb00000000000000000000000000000000000${ts}`;
+  const agentC = `0xccc00000000000000000000000000000000000${ts}`;
 
   // 1. Create evidence
   const created = await request.post(appUrl(testInfo, "/api/evidence"), {
@@ -131,17 +132,28 @@ test("protocol lifecycle: attest → challenge → finalize → RESOLVED (API + 
   });
   expect(fin.ok()).toBeTruthy();
   const finBody = await fin.json();
-  expect(finBody.state.state).toBe("RESOLVED");
-  // 0.9 vs 0.1 with equal stakes → knife-edge 0.5 → V13 escalation: the
-  // dispute is too sharp for a coin-flip, so it escalates to human
-  // arbitration as INDETERMINATE (no false certainty).
-  expect(finBody.state.resolution.result).toBe(null);
-  expect(finBody.state.resolution.method).toBe("HUMAN_ARBITRATION");
-  expect(finBody.state.resolution.tier).toBe("L4_HUMAN_EXPERT");
+  // 0.9 vs 0.1 with equal stakes → knife-edge 0.5 → V14: the dispute stays
+  // DISPUTED (no manufactured certainty); a decisive consensus is required.
+  expect(finBody.state.state).toBe("DISPUTED");
+  expect(finBody.state.resolution).toBe(null);
+  expect(finBody.state.escalated).toBe(true);
 
-  // 5. UI shows the resolved state with tier + effective votes
+  // 5. A new independent validator breaks the knife-edge → RESOLVED
+  const att3 = await request.post(api(`/api/claims/${id}/attest`), {
+    data: { agent: agentC, decision: "CONTRADICTED", confidence: 0.05, stake: "100000000000000000000", model: "gemini" },
+  });
+  expect(att3.ok()).toBeTruthy();
+  const fin2 = await request.post(api(`/api/claims/${id}/finalize`), {
+    data: { confirm: false },
+  });
+  const fin2Body = await fin2.json();
+  expect(fin2Body.state.state).toBe("RESOLVED");
+  expect(fin2Body.state.resolution.method).toBe("CONSENSUS_VOTE");
+  expect(fin2Body.state.resolution.tier).toBe("L2_AI_VALIDATORS");
+
+  // 6. UI shows the resolved state with tier + effective votes
   await page.goto(appUrl(testInfo, `/evidence/${id}`));
   await expect(page.getByText("RESOLVED").first()).toBeVisible();
-  await expect(page.getByText("L4 HUMAN_EXPERT").first()).toBeVisible();
+  await expect(page.getByText("L2 AI_VALIDATORS").first()).toBeVisible();
   await expect(page.getByText(/effective independent/).first()).toBeVisible();
 });
