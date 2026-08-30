@@ -4,6 +4,21 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.8] - 2026-08-30
+
+### Added — V8 MCP finalize_claim: agents run the whole protocol
+
+- New `finalize_claim` MCP tool → **12 total**. With `confirm:true` it closes
+  the challenge window, produces the final resolution, and anchors it
+  on-chain via the dashboard's server-side signer.
+- An AI agent can now complete the ENTIRE lifecycle through MCP alone:
+  `create_evidence_record → attest_claim → challenge_claim → finalize_claim
+  → get_claim_state / verify`.
+- Live-verified end-to-end through the public endpoint: EV-000022 was
+  created, attested, challenged and finalized (anchored, tx
+  `0x8dd91836…`, verified `true` on-chain, root matched).
+- 55 MCP tests pass.
+
 ## [0.5.7] - 2026-08-30
 
 ### Added — V7 on-chain resolution verification (the verifiable loop closes)
