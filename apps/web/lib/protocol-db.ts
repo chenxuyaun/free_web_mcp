@@ -37,18 +37,21 @@ export function ensureProtocolSchema(db: Db): void {
     );
 
     CREATE TABLE IF NOT EXISTS attestations (
-      id          TEXT PRIMARY KEY,
-      evidence_id TEXT NOT NULL,
-      agent       TEXT NOT NULL,
-      decision    TEXT NOT NULL,
-      confidence  REAL NOT NULL,
-      stake       TEXT NOT NULL,
-      rationale   TEXT,
-      model       TEXT,
-      created_at  TEXT NOT NULL,
-      settled_at  TEXT,
-      slashed     INTEGER,
-      reward      TEXT
+      id              TEXT PRIMARY KEY,
+      evidence_id     TEXT NOT NULL,
+      agent           TEXT NOT NULL,
+      decision        TEXT NOT NULL,
+      confidence      REAL NOT NULL,
+      stake           TEXT NOT NULL,
+      rationale       TEXT,
+      model           TEXT,
+      policy          TEXT,
+      search_provider TEXT,
+      sources         TEXT,
+      created_at      TEXT NOT NULL,
+      settled_at      TEXT,
+      slashed         INTEGER,
+      reward          TEXT
     );
 
     CREATE TABLE IF NOT EXISTS challenges (
@@ -83,6 +86,18 @@ export function ensureProtocolSchema(db: Db): void {
   const cols = db.prepare("PRAGMA table_info(resolutions)").all() as Array<{ name: string }>;
   if (!cols.some((c) => c.name === "effective_votes")) {
     db.exec("ALTER TABLE resolutions ADD COLUMN effective_votes REAL");
+  }
+
+  // Migration: add policy / search_provider / sources to attestations
+  const attCols = db.prepare("PRAGMA table_info(attestations)").all() as Array<{ name: string }>;
+  if (!attCols.some((c) => c.name === "policy")) {
+    db.exec("ALTER TABLE attestations ADD COLUMN policy TEXT");
+  }
+  if (!attCols.some((c) => c.name === "search_provider")) {
+    db.exec("ALTER TABLE attestations ADD COLUMN search_provider TEXT");
+  }
+  if (!attCols.some((c) => c.name === "sources")) {
+    db.exec("ALTER TABLE attestations ADD COLUMN sources TEXT");
   }
 }
 
@@ -149,6 +164,9 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
     stake: String(a.stake),
     rationale: a.rationale ? String(a.rationale) : undefined,
     model: a.model ? String(a.model) : undefined,
+    policy: a.policy ? String(a.policy) : undefined,
+    searchProvider: a.search_provider ? String(a.search_provider) : undefined,
+    sources: a.sources ? (JSON.parse(String(a.sources)) as string[]) : undefined,
     createdAt: String(a.created_at),
     settledAt: a.settled_at ? String(a.settled_at) : undefined,
     slashed: a.slashed === null ? undefined : Boolean(a.slashed),
@@ -232,8 +250,9 @@ function saveState(db: Db, state: ClaimResolutionState): void {
   const upsertAtt = db.prepare(
     `INSERT OR REPLACE INTO attestations
        (id, evidence_id, agent, decision, confidence, stake, rationale, model,
+        policy, search_provider, sources,
         created_at, settled_at, slashed, reward)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const a of state.attestations) {
     upsertAtt.run(
@@ -245,6 +264,9 @@ function saveState(db: Db, state: ClaimResolutionState): void {
       a.stake,
       a.rationale ?? null,
       a.model ?? null,
+      a.policy ?? null,
+      a.searchProvider ?? null,
+      a.sources ? JSON.stringify(a.sources) : null,
       a.createdAt,
       a.settledAt ?? null,
       a.slashed === undefined ? null : a.slashed ? 1 : 0,

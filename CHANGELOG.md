@@ -4,6 +4,24 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] - 2026-08-30
+
+### Added — full four-dimension independence correlation (teacher §13)
+
+- `attestationCorrelation` now covers the complete teacher list: same agent
+  (1.0), same `model` (0.7), same `searchProvider` (0.5), overlapping `sources`
+  read (0.5 × Jaccard over the page set, trailing-slash normalized), same
+  `policy` (0.3) — capped at 1.0.
+- `Attestation` gains `searchProvider` and `sources` fields; `policy` is now
+  actually **persisted** (it previously existed on the type but was dropped by
+  the SQLite layer, so policy correlation never fired on dashboard data).
+- DB migration adds `policy` / `search_provider` / `sources` columns to
+  existing attestations tables; attest API accepts all three; dashboard shows
+  provider + sources per attestation and has a Search Provider form field.
+- New tests: 5 correlation dimension cases (evidence) + 1 web round-trip test
+  proving provider/sources persist and drive `effectiveVotes` (2.0 for a
+  bing-bing-exa split).
+
 ## [0.5.1] - 2026-08-30
 
 ### Added — V2 independence-weighted consensus (teacher §12-§13)

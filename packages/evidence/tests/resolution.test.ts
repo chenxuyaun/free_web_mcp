@@ -229,8 +229,45 @@ describe("V2 independence scoring", () => {
       expect(attestationCorrelation(a({ model: "gpt-4" }), a({ agent: "agent-B", model: "gpt-4" }))).toBe(0.7);
     });
 
+    it("same search provider → 0.5 (teacher §13)", () => {
+      expect(attestationCorrelation(a({ searchProvider: "duckduckgo" }), a({ agent: "agent-B", searchProvider: "duckduckgo" }))).toBe(0.5);
+    });
+
+    it("fully overlapping sources → 0.5 (Jaccard 1.0)", () => {
+      const c = attestationCorrelation(
+        a({ sources: ["https://a.com/x", "https://b.com/y"] }),
+        a({ agent: "agent-B", sources: ["https://a.com/x", "https://b.com/y"] }),
+      );
+      expect(c).toBeCloseTo(0.5, 5);
+    });
+
+    it("partially overlapping sources → scaled by Jaccard", () => {
+      const c = attestationCorrelation(
+        a({ sources: ["https://a.com/x", "https://b.com/y"] }),
+        a({ agent: "agent-B", sources: ["https://a.com/x", "https://c.com/z"] }),
+      );
+      // Jaccard = 1/3 → 0.5 × 1/3 ≈ 0.1667
+      expect(c).toBeCloseTo(0.1667, 3);
+    });
+
+    it("trailing slashes are normalized in source overlap", () => {
+      const c = attestationCorrelation(
+        a({ sources: ["https://a.com/x/"] }),
+        a({ agent: "agent-B", sources: ["https://a.com/x"] }),
+      );
+      expect(c).toBeCloseTo(0.5, 5);
+    });
+
     it("same policy → 0.3", () => {
       expect(attestationCorrelation(a({ policy: "search-v2" }), a({ agent: "agent-B", policy: "search-v2" }))).toBe(0.3);
+    });
+
+    it("same model + same search provider + same sources → 1.0 (capped)", () => {
+      const c = attestationCorrelation(
+        a({ model: "gpt-4", searchProvider: "bing", sources: ["https://a.com/x"] }),
+        a({ agent: "agent-B", model: "gpt-4", searchProvider: "bing", sources: ["https://a.com/x"] }),
+      );
+      expect(c).toBe(1.0);
     });
 
     it("same model + same policy → 1.0 (capped)", () => {
@@ -241,8 +278,8 @@ describe("V2 independence scoring", () => {
       expect(c).toBe(1.0);
     });
 
-    it("different model, policy, agent → 0", () => {
-      expect(attestationCorrelation(a({ model: "gpt-4" }), a({ agent: "agent-B", model: "claude" }))).toBe(0);
+    it("different model, provider, sources, policy, agent → 0", () => {
+      expect(attestationCorrelation(a({ model: "gpt-4", searchProvider: "bing", sources: ["https://a.com"], policy: "v1" }), a({ agent: "agent-B", model: "claude", searchProvider: "ddg", sources: ["https://b.com"], policy: "v2" }))).toBe(0);
     });
   });
 

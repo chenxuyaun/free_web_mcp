@@ -11,6 +11,9 @@ interface AttestBody {
   stake: string; // wei VERI
   rationale?: string;
   model?: string;
+  policy?: string;
+  searchProvider?: string;
+  sources?: string[];
 }
 
 /** POST /api/claims/[id]/attest — validator submits a staked judgment. */
@@ -62,6 +65,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       stake,
       rationale: body.rationale,
       model: body.model,
+      policy: body.policy,
+      searchProvider: body.searchProvider,
+      sources: body.sources,
     });
     return NextResponse.json({
       success: true,

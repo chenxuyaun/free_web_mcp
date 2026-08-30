@@ -76,6 +76,12 @@ export interface Attestation {
   rationale?: string;
   model?: string; // "some-model-v7"
   policy?: string; // "web-evidence-v1"
+  /** Search provider used to gather evidence (teacher §13: same Search API
+   *  → same information pipeline). */
+  searchProvider?: string; // "duckduckgo" | "bing" | "exa" | …
+  /** Source pages this validator actually read (teacher §13: same web page
+   *  → same information pipeline). URL list, deduplicated. */
+  sources?: string[];
   createdAt: string; // ISO-8601
   /** Set when this attestation settles. */
   settledAt?: string;
@@ -182,13 +188,28 @@ export interface CitationEnvelope {
 // ---------------------------------------------------------------------------
 
 /** Correlation between two attestations on a 0..1 scale.
- *  Heuristic dependency model: same agent is identical (1.0); sharing a
- *  model is a strong signal of a shared information pipeline (0.7); sharing
- *  a policy is weaker (0.3). */
+ *  Heuristic dependency model (teacher §12-§13: same model / same Search API /
+ *  same web page / same prompt → likely the same information source):
+ *  - same agent            → 1.0 (identical)
+ *  - same model            → 0.7 (strong shared pipeline)
+ *  - same search provider  → 0.5 (shared retrieval channel)
+ *  - overlapping sources   → 0.5 × Jaccard (shared pages read)
+ *  - same policy           → 0.3 (weak signal)
+ *  Capped at 1.0. */
 export function attestationCorrelation(a: Attestation, b: Attestation): number {
   if (a.agent.toLowerCase() === b.agent.toLowerCase()) return 1.0;
   let c = 0;
   if (a.model && b.model && a.model === b.model) c += 0.7;
+  if (a.searchProvider && b.searchProvider && a.searchProvider === b.searchProvider) c += 0.5;
+  // Jaccard overlap over the set of source pages actually read
+  if (a.sources && b.sources && a.sources.length > 0 && b.sources.length > 0) {
+    const aSet = new Set(a.sources.map((s) => s.replace(/\/+$/, "")));
+    const bSet = new Set(b.sources.map((s) => s.replace(/\/+$/, "")));
+    let intersection = 0;
+    for (const s of aSet) if (bSet.has(s)) intersection++;
+    const union = new Set([...aSet, ...bSet]).size;
+    if (union > 0) c += 0.5 * (intersection / union);
+  }
   if (a.policy && b.policy && a.policy === b.policy) c += 0.3;
   return Math.min(1.0, c);
 }

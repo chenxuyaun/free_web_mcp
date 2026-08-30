@@ -17,6 +17,9 @@ interface ClaimStateView {
     reward?: string;
     rationale?: string;
     model?: string;
+    policy?: string;
+    searchProvider?: string;
+    sources?: string[];
   }>;
   challenges: Array<{
     id: string;
@@ -65,6 +68,7 @@ export function ProtocolPanel({ id }: { id: string }) {
   const [stake, setStake] = useState("100000000000000000000");
   const [rationale, setRationale] = useState("");
   const [model, setModel] = useState("");
+  const [searchProvider, setSearchProvider] = useState("");
 
   async function refresh() {
     const res = await fetch(`${BASE_PATH}/api/claims/${id}`, { cache: "no-store" });
@@ -93,6 +97,7 @@ export function ProtocolPanel({ id }: { id: string }) {
         stake,
         rationale: rationale || undefined,
         model: model || undefined,
+        searchProvider: searchProvider || undefined,
       }),
     });
     const body = await res.json();
@@ -229,6 +234,7 @@ export function ProtocolPanel({ id }: { id: string }) {
                       <span className="text-neutral-500">{Math.round(a.confidence * 100)}%</span>
                       <span className="text-neutral-500">{Number(a.stake) / 1e18} VERI</span>
                       {a.model && <span className="text-neutral-500">{a.model}</span>}
+                      {a.searchProvider && <span className="text-neutral-500">{a.searchProvider}</span>}
                       {a.slashed === true && (
                         <span className="text-rose-400">SLASHED</span>
                       )}
@@ -238,6 +244,11 @@ export function ProtocolPanel({ id }: { id: string }) {
                     </span>
                   </div>
                   {a.rationale && <div className="mt-1 text-neutral-500">{a.rationale}</div>}
+                  {a.sources && a.sources.length > 0 && (
+                    <div className="mt-1 truncate text-neutral-600">
+                      sources: {a.sources.join(" · ")}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -298,6 +309,15 @@ export function ProtocolPanel({ id }: { id: string }) {
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     placeholder="e.g. gpt-4o, claude-sonnet (leave blank = independent)"
+                    className="mt-1 w-full rounded bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200"
+                  />
+                </label>
+                <label className="col-span-2 text-xs text-neutral-500">
+                  Search Provider (teacher §13: same API → correlated)
+                  <input
+                    value={searchProvider}
+                    onChange={(e) => setSearchProvider(e.target.value)}
+                    placeholder="e.g. duckduckgo, bing, exa (leave blank = independent)"
                     className="mt-1 w-full rounded bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200"
                   />
                 </label>
