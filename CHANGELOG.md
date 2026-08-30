@@ -4,6 +4,18 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.14] - 2026-08-30
+
+### Added — V16 MCP get_citation: agents fetch the verifiable citation envelope
+
+- New `get_citation` MCP tool → **14 total**. An AI agent can now retrieve
+  the compact citation envelope (claim + evidence refs with SHA-256 +
+  resolution + on-chain anchor) through the MCP interface — the payload the
+  teacher framework says an AI response should carry (§19-§22).
+- Live-verified through the public endpoint: EV-000026 citation returned
+  with claim text, evidence refs, and RESOLVED state.
+- 57 MCP tests pass.
+
 ## [0.5.13] - 2026-08-30
 
 ### Added — V15 citation envelope UI (teacher §19-§22)

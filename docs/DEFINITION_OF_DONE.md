@@ -59,6 +59,11 @@ oracle ladder, and agent participation. All live-verified on yuncai.site.
 | V10 | Configurable proper scoring rules: brier / log (teacher §9-§10) | EV-000024: log rule settled rep exactly 0.9 for 0.9-confident correct |
 | V11 | Playwright e2e protocol lifecycle flow | 5 e2e tests pass (chromium) + CI e2e job |
 
+| V13 | Oracle ladder: knife-edge disputes resolve INDETERMINATE (no coin-flip) | EV-000025: 0.52 vs 0.48 → INDETERMINATE, HUMAN_ARBITRATION, not anchored |
+| V14 | Knife-edge stays DISPUTED — more independent validators can break it | EV-000026: DISPUTED → third validator → RESOLVED (FALSE), challenge UPHELD |
+| V15 | Citation envelope UI — one-click copy for AI consumption | yuncai.site evidence detail page, §19-§22 |
+| V16 | MCP get_citation tool (14 tools) | EV-000026 citation via public MCP endpoint |
+
 ## Not done (honest)
 
 | Item | Why |

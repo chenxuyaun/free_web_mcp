@@ -4,7 +4,7 @@
 
 **Free Web MCP — Verifiable Web Evidence Network**：给 AI Agent 免费网页访问，对网页来源的断言做**证据化验证**，并把证据指纹 **SHA-256 锚定到 BNB Smart Chain Testnet**。双栈 pnpm monorepo。
 
-**当前进度（v0.5.10，V1-V11 已完成）**：六核心对象 + Claim 状态机 + 乐观验证（staking/slashing）+ Brier/Log 双评分声誉 + 独立性加权共识（model/searchProvider/sources/policy 四维相关性）+ oracle ladder 动态升级（L2→L3→L4）+ 挑战 bond 经济结算 + 链上 resolution 验证 + 13 个 MCP 工具（agent 全程参与验证）+ e2e 协议流程测试。全部线上部署验证（yuncai.site）。
+**当前进度（v0.5.14，V1-V16 已完成）**：六核心对象 + Claim 状态机 + 乐观验证（staking/slashing）+ Brier/Log 双评分声誉 + 独立性加权共识（model/searchProvider/sources/policy 四维相关性）+ oracle ladder 动态升级（knife-edge → DISPUTED 可继续 attest，决定性后 RESOLVED）+ 挑战 bond 经济结算 + 链上 resolution 验证 + 14 个 MCP 工具（agent 全程参与验证 + 取引用信封）+ citation envelope UI + e2e 协议流程测试。全部线上部署验证（yuncai.site）。
 
 ## 技术栈
 
