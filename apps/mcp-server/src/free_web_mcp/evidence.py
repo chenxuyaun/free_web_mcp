@@ -87,6 +87,63 @@ def counter_evidence_searches(claim: str) -> list[str]:
     ]
 
 
+_STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for",
+    "with", "as", "at", "by", "is", "are", "was", "were", "be", "been",
+    "this", "that", "it", "its", "from", "has", "have", "had", "do", "does",
+    "did", "not", "no", "so", "if", "then", "than", "too", "very", "can",
+    "will", "just", "also", "would", "could", "should", "may", "might",
+    "的", "了", "和", "是", "在", "有", "与", "及", "或", "都", "也", "这",
+    "那", "就", "而", "但", "并", "等", "被", "把", "让", "对", "从", "到",
+}
+
+
+def _tokenize(text: str) -> list[str]:
+    """Lowercased word tokens (ASCII words + CJK runs), stopwords removed."""
+    tokens: list[str] = []
+    # ASCII words
+    for w in re.findall(r"[a-z0-9]+", text.lower()):
+        if w not in _STOPWORDS:
+            tokens.append(w)
+    # CJK runs — treat each character as a token (no spaces in Chinese)
+    for run in re.findall(r"[\u4e00-\u9fff]+", text):
+        for ch in run:
+            if ch not in _STOPWORDS:
+                tokens.append(ch)
+    return tokens
+
+
+def extract_quote(text: str, claim: str, max_chars: int = 240) -> str | None:
+    """Find the sentence in a fetched page that best supports a claim
+    (teacher §19-§22 short quote).
+
+    Scored by token overlap between the claim and each sentence: the sentence
+    sharing the most non-stopword tokens wins, with a small tie-break for
+    shorter sentences. Returns None if no sentence shares any token (the
+    page does not obviously address the claim).
+    """
+    claim_tokens = set(_tokenize(claim))
+    if not claim_tokens:
+        return None
+
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?。！？])\s+", text) if len(s.strip()) >= 20]
+    best: tuple[float, str] | None = None
+    for s in sentences:
+        sent_tokens = set(_tokenize(s))
+        overlap = len(claim_tokens & sent_tokens)
+        if overlap == 0:
+            continue
+        # Score: overlap count, mildly favoring shorter sentences on ties
+        score = overlap - len(s) * 1e-6
+        if best is None or score > best[0]:
+            best = (score, s)
+
+    if best is None:
+        return None
+    quote = best[1].strip()
+    return quote if len(quote) <= max_chars else quote[:max_chars].rsplit(" ", 1)[0] + "…"
+
+
 class EvidenceApiClient:
     """Thin HTTP client for the dashboard's evidence API."""
 

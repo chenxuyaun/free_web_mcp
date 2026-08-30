@@ -11,7 +11,7 @@ from pydantic import Field
 from free_web_mcp import evidence as _evidence
 from free_web_mcp.deps import AppContext
 from free_web_mcp.errors import ErrorCode, ToolError, ToolErrorPayload
-from free_web_mcp.evidence import EvidenceApiClient, counter_evidence_searches
+from free_web_mcp.evidence import EvidenceApiClient, counter_evidence_searches, extract_quote
 from free_web_mcp.logging import get_logger
 from free_web_mcp.models.page import (
     SearchAndFetchResponse,
@@ -373,6 +373,32 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         try:
             searches = counter_evidence_searches(claim)
             return {"success": True, "claim": claim, "searches": searches}
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="extract_quote",
+        title="Extract Supporting Quote",
+        description=(
+            "Find the sentence in a fetched page that best supports a claim — "
+            "the verbatim quote an evidence record should carry (teacher §19-§22). "
+            "Pass the page's main text and the claim; returns the best-matching "
+            "sentence (or null if the page does not obviously address the claim). "
+            "Use the result as the quote field of create_evidence_record."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def extract_quote_tool(
+        text: Annotated[str, Field(description="The page's main text content.")],
+        claim: Annotated[str, Field(description="The claim being verified.")],
+        max_chars: Annotated[
+            int,
+            Field(ge=20, le=600, description="Maximum quote length in characters."),
+        ] = 240,
+    ) -> dict[str, Any]:
+        try:
+            quote = extract_quote(text, claim, max_chars=max_chars)
+            return {"success": True, "claim": claim, "quote": quote}
         except ToolError as exc:
             return _error_payload(exc)
 
