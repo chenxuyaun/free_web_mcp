@@ -4,6 +4,17 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.10] - 2026-08-30
+
+### Added — V11 e2e coverage of the full verification protocol
+
+- New Playwright e2e flow: create evidence → attest (two diverse validators)
+  → challenge → finalize → RESOLVED, asserting the oracle tier escalation
+  (knife-edge 0.5 → L4_HUMAN_EXPERT) and the effective-votes line in the UI.
+- Uses per-run unique validator addresses so V3 reputation weighting stays
+  deterministic across repeated runs.
+- 5 e2e tests pass locally (chromium), CI e2e job covers the same suite.
+
 ## [0.5.9] - 2026-08-30
 
 ### Added — V10 configurable proper scoring rules (teacher §9-§10)

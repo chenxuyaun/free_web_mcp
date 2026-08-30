@@ -79,3 +79,66 @@ test("export JSON downloads a valid package", async ({ page }, testInfo) => {
   const dl = await download;
   expect(dl.suggestedFilename()).toBe(`${evidenceId}.json`);
 });
+
+// ---------------------------------------------------------------------------
+// Verification protocol flow (V11) — offline-safe: no chain confirm, so the
+// resolution is produced locally; the challenge forces CONSENSUS_VOTE.
+// ---------------------------------------------------------------------------
+
+test("protocol lifecycle: attest → challenge → finalize → RESOLVED (API + UI)", async ({ request, page }, testInfo) => {
+  // Unique validators per run — reputation accumulates across finalizes, and
+  // V3 reputation-weighting would shift the consensus probability on reruns.
+  const ts = Date.now().toString(36);
+  const agentA = `0xaaa00000000000000000000000000000000000${ts}`;
+  const agentB = `0xbbb00000000000000000000000000000000000${ts}`;
+
+  // 1. Create evidence
+  const created = await request.post(appUrl(testInfo, "/api/evidence"), {
+    data: {
+      claim: { text: "E2E protocol claim: attest-challenge-finalize", type: "fact" },
+      supporting: [
+        { url: "https://e2e.example/proto-1", title: "Proto Source", sourceType: "official" },
+      ],
+    },
+  });
+  expect(created.ok()).toBeTruthy();
+  const { id } = await created.json();
+  expect(id).toMatch(/^EV-\d{6}$/);
+
+  const api = (path: string) => appUrl(testInfo, path);
+
+  // 2. Attest (two diverse validators, one SUPPORTED one CONTRADICTED)
+  const att1 = await request.post(api(`/api/claims/${id}/attest`), {
+    data: { agent: agentA, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" },
+  });
+  expect(att1.ok()).toBeTruthy();
+  const att2 = await request.post(api(`/api/claims/${id}/attest`), {
+    data: { agent: agentB, decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000", model: "claude" },
+  });
+  expect(att2.ok()).toBeTruthy();
+
+  // 3. Challenge → forces CONSENSUS_VOTE (no 24h window wait)
+  const chl = await request.post(api(`/api/claims/${id}/challenge`), {
+    data: { challenger: "0xccc", bond: "100000000000000000000", reason: "e2e dispute" },
+  });
+  expect(chl.ok()).toBeTruthy();
+  const chlBody = await chl.json();
+  expect(chlBody.state.state).toBe("CHALLENGED");
+
+  // 4. Finalize without confirm (offline — resolution produced locally)
+  const fin = await request.post(api(`/api/claims/${id}/finalize`), {
+    data: { confirm: false },
+  });
+  expect(fin.ok()).toBeTruthy();
+  const finBody = await fin.json();
+  expect(finBody.state.state).toBe("RESOLVED");
+  expect(finBody.state.resolution.method).toBe("CONSENSUS_VOTE");
+  // 0.9 vs 0.1 with equal stakes → 0.5 → knife-edge → L4 escalation
+  expect(finBody.state.resolution.tier).toBe("L4_HUMAN_EXPERT");
+
+  // 5. UI shows the resolved state with tier + effective votes
+  await page.goto(appUrl(testInfo, `/evidence/${id}`));
+  await expect(page.getByText("RESOLVED").first()).toBeVisible();
+  await expect(page.getByText("L4 HUMAN_EXPERT").first()).toBeVisible();
+  await expect(page.getByText(/effective independent/).first()).toBeVisible();
+});
