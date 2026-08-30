@@ -19,6 +19,9 @@ export interface EvidenceRowSummary {
   hash: string;
   anchored: boolean;
   createdAt: string;
+  /** V22: claim protocol lifecycle state (OBSERVED/SUPPORTED/CHALLENGED/
+   *  DISPUTED/RESOLVED) — null if no claim row exists yet. */
+  protocolState?: string;
 }
 
 export interface EvidenceStats {
@@ -210,7 +213,11 @@ export function listEvidence(
   const lim = limit ? `LIMIT ${Number(limit)}` : "";
   const rows = db
     .prepare(
-      `SELECT id, claim_text, claim_type, status, confidence, hash, anchored, created_at FROM evidence ${where} ORDER BY created_at DESC ${lim}`,
+      `SELECT e.id, e.claim_text, e.claim_type, e.status, e.confidence, e.hash, e.anchored, e.created_at,
+              c.state AS protocol_state
+       FROM evidence e
+       LEFT JOIN claims c ON c.evidence_id = e.id
+       ${where} ORDER BY e.created_at DESC ${lim}`,
     )
     .all(...params) as Array<{
     id: string;
@@ -221,6 +228,7 @@ export function listEvidence(
     hash: string;
     anchored: number;
     created_at: string;
+    protocol_state: string | null;
   }>;
   return rows.map((r) => ({
     id: r.id,
@@ -231,6 +239,7 @@ export function listEvidence(
     hash: r.hash,
     anchored: r.anchored === 1,
     createdAt: r.created_at,
+    protocolState: r.protocol_state ?? undefined,
   }));
 }
 

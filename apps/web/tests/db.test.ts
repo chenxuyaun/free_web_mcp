@@ -155,4 +155,13 @@ describe("evidence db layer", () => {
     // quoteHash is sha256 of the verbatim quote — citation can be re-verified
     expect(sha256(src.quote)).toMatch(/^[0-9a-f]{64}$/);
   });
+
+  it("V22: evidence list joins the claim protocol state", () => {
+    const dbPath = makeDbPath();
+    const saved = insertEvidence(makePkg("Protocol state check"), dbPath);
+
+    // Fresh evidence auto-initializes a claim in OBSERVED
+    const items = listEvidence(dbPath);
+    expect(items.find((i) => i.id === saved.id)?.protocolState).toBe("OBSERVED");
+  });
 });

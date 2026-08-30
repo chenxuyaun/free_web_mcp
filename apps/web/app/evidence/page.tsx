@@ -11,16 +11,29 @@ const statusColor: Record<string, string> = {
   INSUFFICIENT_EVIDENCE: "text-neutral-400 border-neutral-700",
 };
 
+const protocolColor: Record<string, string> = {
+  OBSERVED: "text-sky-300 border-sky-800",
+  SUPPORTED: "text-emerald-300 border-emerald-800",
+  CHALLENGED: "text-amber-300 border-amber-800",
+  DISPUTED: "text-orange-300 border-orange-800",
+  RESOLVED: "text-violet-300 border-violet-800",
+  FINAL: "text-green-300 border-green-700",
+};
+
 const STATUSES = ["SUPPORTED", "LIKELY_TRUE", "CONTRADICTED", "INSUFFICIENT_EVIDENCE"] as const;
+const PROTOCOL_STATES = ["OBSERVED", "SUPPORTED", "CHALLENGED", "DISPUTED", "RESOLVED", "FINAL"] as const;
 
 export default function EvidenceListPage({
   searchParams,
 }: {
-  searchParams?: { status?: string; q?: string };
+  searchParams?: { status?: string; protocol?: string; q?: string };
 }) {
   const status = searchParams?.status || undefined;
+  const protocol = searchParams?.protocol || undefined;
   const q = searchParams?.q || undefined;
-  const items = listEvidence({ status, q, limit: 100 });
+  const items = listEvidence({ status, q, limit: 100 }).filter(
+    (e) => !protocol || e.protocolState === protocol,
+  );
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
@@ -56,13 +69,25 @@ export default function EvidenceListPage({
             </option>
           ))}
         </select>
+        <select
+          name="protocol"
+          defaultValue={protocol ?? ""}
+          className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm text-neutral-300"
+        >
+          <option value="">All protocol states</option>
+          {PROTOCOL_STATES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           className="rounded border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800"
         >
           Filter
         </button>
-        {(status || q) && (
+        {(status || q || protocol) && (
           <Link href="/evidence" className="text-xs text-neutral-500 hover:text-neutral-300">
             Clear
           </Link>
@@ -92,6 +117,15 @@ export default function EvidenceListPage({
                   >
                     {e.status}
                   </span>
+                  {e.protocolState && (
+                    <span
+                      className={`rounded border px-2 py-0.5 text-xs font-semibold ${
+                        protocolColor[e.protocolState] ?? "text-neutral-400 border-neutral-700"
+                      }`}
+                    >
+                      {e.protocolState}
+                    </span>
+                  )}
                   <span className="text-xs text-neutral-500">
                     confidence {(e.confidence * 100).toFixed(0)}%
                   </span>
