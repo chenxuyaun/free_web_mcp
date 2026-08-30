@@ -7,8 +7,9 @@ services:
     branch: main
     rootDir: .
     buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @free-web-mcp/web build"
-    startCommand: "pnpm --filter @free-web-mcp/web start"
-    healthCheckPath: /api/health
+    startCommand: "cd apps/web && pnpm exec next start -p ${PORT:-3000} -H 0.0.0.0"
+    # basePath is /webmcp, so the dashboard health route lives under it
+    healthCheckPath: /webmcp/api/health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -18,19 +19,19 @@ services:
       - key: BSC_NETWORK
         value: bsc-testnet
       - key: BSC_RPC_URL
-        value: https://data-seed-prebsc-1-s1.binance.org:8545
+        value: https://bsc-testnet-rpc.publicnode.com
       - key: BSC_EXPLORER_URL
         value: https://testnet.bscscan.com
       - key: EVIDENCE_REGISTRY_ADDRESS
-        sync: false   # 0xD4F14929A1694932439DDa1D481aA127f80185D7
+        sync: false   # 0x19AB142cA0Aad02BB55ffB6129494926c520c60F (live BSC Testnet)
       - key: VERI_TOKEN_ADDRESS
-        sync: false   # 0x4FF843Db5196B3Ca7438ABe6E3d6FC16d94350Da
+        sync: false   # 0xDDcbC86dE41bB8863a4Acd929E965d0E07A54C76 (live BSC Testnet)
       - key: WALLET_PRIVATE_KEY
         sync: false   # testnet signer — set in Render dashboard, NEVER commit
       - key: MCP_SERVER_URL
         value: https://free-web-mcp-mcp.onrender.com
 
-  # Python MCP server (Streamable HTTP on :10000, 8 tools)
+  # Python MCP server (Streamable HTTP, 16 tools)
   - type: web
     name: free-web-mcp-mcp
     runtime: python
@@ -38,7 +39,7 @@ services:
     branch: main
     rootDir: apps/mcp-server
     buildCommand: "pip install uv && uv sync --frozen"
-    startCommand: "uv run --no-sync free-web-mcp --transport http --host 0.0.0.0 --port 10000"
+    startCommand: "uv run --no-sync free-web-mcp --transport http --host 0.0.0.0 --port ${PORT:-10000}"
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -46,3 +47,5 @@ services:
         value: "3.12"
       - key: SEARCH_PROVIDER
         value: auto
+      - key: EVIDENCE_API_URL
+        value: https://free-web-mcp-web.onrender.com/webmcp
