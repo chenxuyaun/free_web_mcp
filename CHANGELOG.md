@@ -4,6 +4,19 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.19] - 2026-08-30
+
+### Added — V21 extract_quote: automatic supporting-quote extraction
+
+- New `extract_quote` MCP tool → **16 total**. Given a fetched page's text
+  and a claim, it finds the sentence that best supports the claim
+  (token-overlap scoring, stopwords, CJK-aware, length cap) — the verbatim
+  quote an evidence record should carry, extracted automatically instead of
+  by hand (teacher §19-§22).
+- Live-verified: extract_quote via public MCP returned the supporting
+  sentence for a sample claim.
+- 5 new tests (pure + Chinese + MCP tool); 63 MCP tests pass.
+
 ## [0.5.18] - 2026-08-30
 
 ### Added — V20 MCP arbitrate_claim: agents complete the oracle ladder
