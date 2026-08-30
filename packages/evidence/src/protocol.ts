@@ -91,6 +91,10 @@ export interface Attestation {
    *  track record that this judgment is staked on. */
   reputation?: number;
   createdAt: string; // ISO-8601
+  /** V27: historical agreement rate (0..1) with other agents on the same
+   *  claim — how often this agent has voted the same way as the other agents
+   *  on past claims. Reduces independence scoring. */
+  historicalDependency?: number;
   /** Set when this attestation settles. */
   settledAt?: string;
   slashed?: boolean;
@@ -230,6 +234,7 @@ export interface CitationEnvelope {
  *  - same search provider  → 0.5 (shared retrieval channel)
  *  - overlapping sources   → 0.5 × Jaccard (shared pages read)
  *  - same policy           → 0.3 (weak signal)
+ *  - V27: historicalDependency → 0.4 × avg(historicalDependency of both)
  *  Capped at 1.0. */
 export function attestationCorrelation(a: Attestation, b: Attestation): number {
   if (a.agent.toLowerCase() === b.agent.toLowerCase()) return 1.0;
@@ -246,6 +251,9 @@ export function attestationCorrelation(a: Attestation, b: Attestation): number {
     if (union > 0) c += 0.5 * (intersection / union);
   }
   if (a.policy && b.policy && a.policy === b.policy) c += 0.3;
+  // V27: agents who have historically agreed tend to share information pipelines
+  const hd = ((a.historicalDependency ?? 0) + (b.historicalDependency ?? 0)) / 2;
+  if (hd > 0) c += 0.4 * hd;
   return Math.min(1.0, c);
 }
 

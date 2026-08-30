@@ -621,3 +621,58 @@ describe("V26 VERI emission caps (SQLite-backed)", () => {
     expect(ch.bondReward).toBe("1000000000000000000");
   });
 });
+
+describe("V27 historical dependency (SQLite-backed)", () => {
+  const AGENT_A = "0x60a0Ee9e28b609B740A3588121C7C2B34FE64eF4";
+  const AGENT_B = "0x8Ba1F109551bD432803012645Ac136ddd64DBA72";
+
+  it("attestClaim computes historicalDependency from past shared judgments", async () => {
+    const dbPath = makeDbPath();
+    const db = getDb(dbPath);
+    // Two prior claims where A and B both voted SUPPORTED (they agree)
+    const id1 = makeEvidence(dbPath);
+    attestClaim(db, id1, { agent: AGENT_A, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    attestClaim(db, id1, { agent: AGENT_B, decision: "SUPPORTED", confidence: 0.8, stake: "100000000000000000000" }, FAST);
+
+    // On the new claim A attests first (no prior peers yet → dependency 0)
+    const id2 = makeEvidence(dbPath);
+    const afterA = attestClaim(db, id2, { agent: AGENT_A, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    expect(afterA.attestations[0].historicalDependency).toBe(0);
+
+    // B joins — A is already here, and they agreed 100% on the past claim
+    const afterB = attestClaim(db, id2, { agent: AGENT_B, decision: "SUPPORTED", confidence: 0.8, stake: "100000000000000000000" }, FAST);
+    const bAtt = afterB.attestations.find((a) => a.agent === AGENT_B);
+    expect(bAtt?.historicalDependency).toBeCloseTo(1.0, 5);
+  });
+
+  it("historicalDependency round-trips through SQLite", async () => {
+    const dbPath = makeDbPath();
+    const db = getDb(dbPath);
+    const id1 = makeEvidence(dbPath);
+    attestClaim(db, id1, { agent: AGENT_A, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    attestClaim(db, id1, { agent: AGENT_B, decision: "SUPPORTED", confidence: 0.8, stake: "100000000000000000000" }, FAST);
+
+    const id2 = makeEvidence(dbPath);
+    attestClaim(db, id2, { agent: AGENT_A, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    attestClaim(db, id2, { agent: AGENT_B, decision: "SUPPORTED", confidence: 0.8, stake: "100000000000000000000" }, FAST);
+
+    const reloaded = loadClaimState(db, id2)!;
+    const bReloaded = reloaded.attestations.find((a) => a.agent === AGENT_B);
+    expect(bReloaded?.historicalDependency).toBeCloseTo(1.0, 5);
+  });
+
+  it("disagreeing history lowers historicalDependency", async () => {
+    const dbPath = makeDbPath();
+    const db = getDb(dbPath);
+    // A supports, B contradicts → they disagree on the past claim
+    const id1 = makeEvidence(dbPath);
+    attestClaim(db, id1, { agent: AGENT_A, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    attestClaim(db, id1, { agent: AGENT_B, decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000" }, FAST);
+
+    const id2 = makeEvidence(dbPath);
+    attestClaim(db, id2, { agent: AGENT_A, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    const afterB = attestClaim(db, id2, { agent: AGENT_B, decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000" }, FAST);
+    const bAtt = afterB.attestations.find((a) => a.agent === AGENT_B);
+    expect(bAtt?.historicalDependency).toBeCloseTo(0, 5); // 0 agreements / 1 shared
+  });
+});

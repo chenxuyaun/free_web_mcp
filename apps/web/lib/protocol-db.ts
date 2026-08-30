@@ -93,7 +93,8 @@ export function ensureProtocolSchema(db: Db): void {
       created_at      TEXT NOT NULL,
       settled_at      TEXT,
       slashed         INTEGER,
-      reward          TEXT
+      reward          TEXT,
+      historical_dependency REAL
     );
 
     CREATE TABLE IF NOT EXISTS challenges (
@@ -141,7 +142,8 @@ export function ensureProtocolSchema(db: Db): void {
     db.exec("ALTER TABLE resolutions ADD COLUMN resolution_version TEXT");
   }
 
-  // Migration: add policy / search_provider / sources to attestations
+  // Migration: add policy / search_provider / sources / historical_dependency
+  // to attestations
   const attCols = db.prepare("PRAGMA table_info(attestations)").all() as Array<{ name: string }>;
   if (!attCols.some((c) => c.name === "policy")) {
     db.exec("ALTER TABLE attestations ADD COLUMN policy TEXT");
@@ -154,6 +156,9 @@ export function ensureProtocolSchema(db: Db): void {
   }
   if (!attCols.some((c) => c.name === "reputation")) {
     db.exec("ALTER TABLE attestations ADD COLUMN reputation REAL");
+  }
+  if (!attCols.some((c) => c.name === "historical_dependency")) {
+    db.exec("ALTER TABLE attestations ADD COLUMN historical_dependency REAL");
   }
 
   // Migration: challenge bond settlement columns (V6)
@@ -237,6 +242,9 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
     settledAt: a.settled_at ? String(a.settled_at) : undefined,
     slashed: a.slashed === null ? undefined : Boolean(a.slashed),
     reward: a.reward ? String(a.reward) : undefined,
+    historicalDependency: a.historical_dependency === null || a.historical_dependency === undefined
+      ? undefined
+      : Number(a.historical_dependency),
   }));
 
   state.challenges = (db
@@ -323,8 +331,8 @@ function saveState(db: Db, state: ClaimResolutionState): void {
     `INSERT OR REPLACE INTO attestations
        (id, evidence_id, agent, decision, confidence, stake, rationale, model,
         policy, search_provider, sources, reputation,
-        created_at, settled_at, slashed, reward)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        created_at, settled_at, slashed, reward, historical_dependency)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const a of state.attestations) {
     upsertAtt.run(
@@ -344,6 +352,7 @@ function saveState(db: Db, state: ClaimResolutionState): void {
       a.settledAt ?? null,
       a.slashed === undefined ? null : a.slashed ? 1 : 0,
       a.reward ?? null,
+      a.historicalDependency ?? null,
     );
   }
 
@@ -419,6 +428,45 @@ function protocolId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** V27: compute an agent's historical dependency with the other agents who
+ *  have already attested on this claim. For each other agent, look at all
+ *  PAST claims (excluding the current one) where both agents voted a
+ *  directional decision (SUPPORTED/CONTRADICTED) and compute the agreement
+ *  rate (same side = agree). historicalDependency = average over the other
+ *  agents of that pairwise agreement. 0 = no shared history / no other agents.
+ *  Pure SQL over the existing attestations table — no new table. */
+export function computeHistoricalDependency(db: Db, evidenceId: string, agent: string): number {
+  const others = db
+    .prepare(
+      `SELECT DISTINCT agent FROM attestations
+       WHERE evidence_id = ? AND LOWER(agent) != LOWER(?)`,
+    )
+    .all(evidenceId, agent) as Array<{ agent: string }>;
+  if (others.length === 0) return 0;
+
+  let total = 0;
+  let count = 0;
+  for (const other of others) {
+    const rows = db
+      .prepare(
+        `SELECT a.decision AS mine, b.decision AS theirs
+         FROM attestations a
+         JOIN attestations b ON a.evidence_id = b.evidence_id
+         WHERE a.evidence_id != ?
+           AND LOWER(a.agent) = LOWER(?) AND LOWER(b.agent) = LOWER(?)
+           AND a.decision IN ('SUPPORTED','CONTRADICTED')
+           AND b.decision IN ('SUPPORTED','CONTRADICTED')
+           AND a.id != b.id`,
+      )
+      .all(evidenceId, agent, other.agent) as Array<{ mine: string; theirs: string }>;
+    if (rows.length === 0) continue;
+    const agree = rows.filter((r) => r.mine === r.theirs).length;
+    total += agree / rows.length;
+    count++;
+  }
+  return count === 0 ? 0 : total / count;
+}
+
 export function attestClaim(
   db: Db,
   evidenceId: string,
@@ -439,6 +487,9 @@ export function attestClaim(
     claimId: evidenceId,
     createdAt: now,
     reputation,
+    // V27: how much this agent has historically agreed with the other
+    // validators already on this claim (fed into independence scoring).
+    historicalDependency: computeHistoricalDependency(db, evidenceId, input.agent),
   };
   return withState(db, evidenceId, (s) => submitAttestation(s, att, config, now));
 }

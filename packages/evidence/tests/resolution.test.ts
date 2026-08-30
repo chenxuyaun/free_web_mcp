@@ -290,6 +290,33 @@ describe("V2 independence scoring", () => {
     it("different model, provider, sources, policy, agent → 0", () => {
       expect(attestationCorrelation(a({ model: "gpt-4", searchProvider: "bing", sources: ["https://a.com"], policy: "v1" }), a({ agent: "agent-B", model: "claude", searchProvider: "ddg", sources: ["https://b.com"], policy: "v2" }))).toBe(0);
     });
+
+    it("V27: historicalDependency adds 0.4×avg factor", () => {
+      // Both have 0.5 historical agreement → +0.4×0.5 = +0.2
+      const c = attestationCorrelation(
+        a({ historicalDependency: 0.5 }),
+        a({ agent: "agent-B", historicalDependency: 0.5 }),
+      );
+      expect(c).toBeCloseTo(0.2, 5);
+    });
+
+    it("V27: historicalDependency 1.0 + model → capped at 1.0", () => {
+      const c = attestationCorrelation(
+        a({ historicalDependency: 1.0, model: "gpt-4" }),
+        a({ agent: "agent-B", historicalDependency: 1.0, model: "gpt-4" }),
+      );
+      // 0.7 (model) + 0.4 (historical) = 1.1 → capped at 1.0
+      expect(c).toBe(1.0);
+    });
+
+    it("V27: historicalDependency only on one side uses the average", () => {
+      const c = attestationCorrelation(
+        a({ historicalDependency: 0.5 }),
+        a({ agent: "agent-B" }), // no historicalDependency
+      );
+      // avg(0.5, 0) = 0.25 → 0.4×0.25 = 0.1
+      expect(c).toBeCloseTo(0.1, 5);
+    });
   });
 
   describe("computeIndependence", () => {
