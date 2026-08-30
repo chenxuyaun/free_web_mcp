@@ -46,6 +46,9 @@ async def test_list_tools() -> None:
         "find_counter_evidence",
         "create_evidence_record",
         "get_evidence",
+        "get_claim_state",
+        "attest_claim",
+        "challenge_claim",
     }
 
 
@@ -141,3 +144,92 @@ async def test_web_fetch_rendered_disabled_returns_error() -> None:
     )
     assert payload["success"] is False
     assert payload["error"]["type"] == "RENDER_FAILED"
+
+
+# ---------------------------------------------------------------------------
+# Verification-protocol tools (V5) — these call the dashboard's claims API
+# ---------------------------------------------------------------------------
+
+CLAIM_STATE_BODY = {
+    "success": True,
+    "state": {
+        "id": "EV-000001",
+        "state": "SUPPORTED",
+        "evidenceHash": "0xabc",
+        "attestations": [],
+        "challenges": [],
+        "resolution": None,
+        "challengeDeadline": 1788000000,
+    },
+}
+
+
+@respx.mock
+async def test_get_claim_state() -> None:
+    respx.get("http://test:3000/api/claims/EV-000001").respond(200, json=CLAIM_STATE_BODY)
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(ctx, "get_claim_state", {"evidence_id": "EV-000001"})
+    assert payload["success"] is True
+    assert payload["state"]["state"] == "SUPPORTED"
+
+
+@respx.mock
+async def test_attest_claim_posts_to_dashboard() -> None:
+    route = respx.post("http://test:3000/api/claims/EV-000001/attest").respond(
+        200,
+        json={"success": True, "state": {"id": "EV-000001", "state": "SUPPORTED", "attestations": 1}},
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(
+        ctx,
+        "attest_claim",
+        {
+            "evidence_id": "EV-000001",
+            "agent": "0x1234",
+            "decision": "SUPPORTED",
+            "confidence": 0.9,
+            "stake": "100000000000000000000",
+            "model": "gpt-4o",
+            "search_provider": "bing",
+            "sources": ["https://a.com"],
+        },
+    )
+    assert payload["success"] is True
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["model"] == "gpt-4o"
+    assert sent["searchProvider"] == "bing"
+    assert sent["sources"] == ["https://a.com"]
+
+
+@respx.mock
+async def test_challenge_claim_posts_to_dashboard() -> None:
+    route = respx.post("http://test:3000/api/claims/EV-000001/challenge").respond(
+        200,
+        json={"success": True, "state": {"id": "EV-000001", "state": "CHALLENGED", "challenges": 1}},
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(
+        ctx,
+        "challenge_claim",
+        {"evidence_id": "EV-000001", "challenger": "0x9999", "bond": "100", "reason": "contradicts"},
+    )
+    assert payload["success"] is True
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["challenger"] == "0x9999"
+    assert sent["reason"] == "contradicts"
+
+
+@respx.mock
+async def test_attest_claim_wraps_dashboard_error() -> None:
+    respx.post("http://test:3000/api/claims/EV-000001/attest").respond(
+        409,
+        json={"success": False, "error": {"type": "RENDER_FAILED", "message": "Cannot attest in state RESOLVED"}},
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(
+        ctx,
+        "attest_claim",
+        {"evidence_id": "EV-000001", "agent": "0x1234", "decision": "SUPPORTED", "confidence": 0.9, "stake": "100"},
+    )
+    assert payload["success"] is False
+    assert "Cannot attest" in payload["error"]["message"]

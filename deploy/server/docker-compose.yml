@@ -40,7 +40,8 @@
         "8766:8766"
       ],
       "environment": {
-        "SEARCH_PROVIDER": "auto"
+        "SEARCH_PROVIDER": "auto",
+        "EVIDENCE_API_URL": "http://web:3000/webmcp"
       }
     }
   },

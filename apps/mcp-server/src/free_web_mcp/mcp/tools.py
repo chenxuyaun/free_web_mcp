@@ -46,6 +46,11 @@ _AUTHORITATIVE_TLDS = (".gov", ".edu", ".int", ".mil", ".ac.")
 # public internet; destructive_hint=False for the same reason.
 READ_OPEN = ToolAnnotations(read_only_hint=True, open_world_hint=True, destructive_hint=False)
 
+# Protocol write tools submit attestations / challenges to the dashboard's
+# protocol API, which persists to SQLite (not the chain). The chain write
+# still requires an explicit confirm on the dashboard side.
+WRITE_API = ToolAnnotations(read_only_hint=False, open_world_hint=True, destructive_hint=False)
+
 
 def _error_payload(exc: Exception) -> dict[str, Any]:
     if isinstance(exc, ToolError):
@@ -435,5 +440,96 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         try:
             client = EvidenceApiClient(ctx.settings.evidence_api_url)
             return client.get_evidence(evidence_id)
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="get_claim_state",
+        title="Get Claim State",
+        description=(
+            "Fetch the full verification-protocol state of a claim (attestations, "
+            "challenges, resolution, effective independent votes, oracle tier). "
+            "Use this before attesting or challenging to see where the claim is "
+            "in its lifecycle."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def get_claim_state(
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.get_claim_state(evidence_id)
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="attest_claim",
+        title="Attest a Claim",
+        description=(
+            "Submit a staked validator judgment on a claim: SUPPORTED / CONTRADICTED / "
+            "UNCERTAIN with a confidence 0..1 and a VERI stake. The dashboard records "
+            "it, opens a challenge window on the first attestation, and later weights "
+            "your vote by stake, model independence, and your reputation. Provide the "
+            "model (and search provider / sources) you used so correlated agents don't "
+            "inflate consensus."
+        ),
+        annotations=WRITE_API,
+    )
+    async def attest_claim(
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
+        agent: Annotated[str, Field(description="Wallet address (0x…) or eip155:… agent id.")],
+        decision: Annotated[
+            str, Field(description="SUPPORTED, CONTRADICTED, or UNCERTAIN.")
+        ] = "SUPPORTED",
+        confidence: Annotated[float, Field(description="Probability of the claim being true, 0..1.")] = 0.9,
+        stake: Annotated[str, Field(description="VERI staked, as a wei integer string (e.g. 100e18).")] = "100000000000000000000",
+        rationale: Annotated[str | None, Field(description="Why you made this judgment.")] = None,
+        model: Annotated[str | None, Field(description="Model used to evaluate (drives independence scoring).")] = None,
+        search_provider: Annotated[str | None, Field(description="Search API used, e.g. duckduckgo/bing/exa.")] = None,
+        sources: Annotated[list[str] | None, Field(description="Source pages read, e.g. [\"https://…\"], deduplicated.")] = None,
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.attest_claim(
+                evidence_id=evidence_id,
+                agent=agent,
+                decision=decision,
+                confidence=confidence,
+                stake=stake,
+                rationale=rationale,
+                model=model,
+                search_provider=search_provider,
+                sources=sources,
+            )
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
+        name="challenge_claim",
+        title="Challenge a Claim",
+        description=(
+            "Dispute an attestation on a claim: bond VERI and give a reason. A "
+            "challenge moves the claim from SUPPORTED to CHALLENGED, forcing a "
+            "consensus vote at resolution instead of optimistic finalize — and "
+            "escalates the oracle tier if disagreement is sharp. Your bond is "
+            "returned with a reward if the challenge is upheld."
+        ),
+        annotations=WRITE_API,
+    )
+    async def challenge_claim(
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
+        challenger: Annotated[str, Field(description="Wallet address (0x…) or eip155:… agent id.")],
+        bond: Annotated[str, Field(description="VERI bonded, as a wei integer string.")] = "100000000000000000000",
+        reason: Annotated[str, Field(description="Why the attestation is wrong.")] = "Evidence does not support the claim",
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.challenge_claim(
+                evidence_id=evidence_id,
+                challenger=challenger,
+                bond=bond,
+                reason=reason,
+            )
         except ToolError as exc:
             return _error_payload(exc)

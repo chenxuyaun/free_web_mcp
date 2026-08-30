@@ -115,6 +115,49 @@ class EvidenceApiClient:
     def get_evidence(self, evidence_id: str) -> dict[str, object]:
         return self._get(f"/api/evidence/{evidence_id}")
 
+    def get_claim_state(self, evidence_id: str) -> dict[str, object]:
+        """Fetch the full claim lifecycle state (attestations, challenges,
+        resolution, effective votes, tier)."""
+        return self._get(f"/api/claims/{evidence_id}")
+
+    def attest_claim(
+        self,
+        evidence_id: str,
+        agent: str,
+        decision: str,
+        confidence: float,
+        stake: str,
+        rationale: str | None = None,
+        model: str | None = None,
+        search_provider: str | None = None,
+        sources: list[str] | None = None,
+    ) -> dict[str, object]:
+        payload = {
+            "agent": agent,
+            "decision": decision,
+            "confidence": confidence,
+            "stake": stake,
+            "rationale": rationale,
+            "model": model,
+            "searchProvider": search_provider,
+            "sources": sources,
+        }
+        return self._post(f"/api/claims/{evidence_id}/attest", payload)
+
+    def challenge_claim(
+        self,
+        evidence_id: str,
+        challenger: str,
+        bond: str,
+        reason: str,
+    ) -> dict[str, object]:
+        payload = {
+            "challenger": challenger,
+            "bond": bond,
+            "reason": reason,
+        }
+        return self._post(f"/api/claims/{evidence_id}/challenge", payload)
+
     def _post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
         try:
             response = httpx.post(f"{self._base}{path}", json=payload, timeout=self._timeout)
