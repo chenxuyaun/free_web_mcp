@@ -4,6 +4,18 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.15] - 2026-08-30
+
+### Added — V17 real source quotes in citation envelopes (teacher §19-§22)
+
+- `EvidenceSource` gains an optional verbatim `quote` captured at evidence
+  creation. The citation envelope now carries the actual source quote (with
+  `quoteHash = sha256(quote)`), falling back to the claim text when absent.
+- `create_evidence_record` (API + MCP) accepts and persists quotes; the MCP
+  tool description documents the field.
+- Live-verified: EV-000027 citation returns the real source quote
+  ("The Shenzhen facility shipped 1,230,000 units in Q3…") + quoteHash.
+
 ## [0.5.14] - 2026-08-30
 
 ### Added — V16 MCP get_citation: agents fetch the verifiable citation envelope
