@@ -4,6 +4,19 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.20] - 2026-08-30
+
+### Added — V22 evidence list shows claim protocol state
+
+- `listEvidence` LEFT JOINs the claims table so every record carries its
+  protocol lifecycle state (OBSERVED / SUPPORTED / CHALLENGED / DISPUTED /
+  RESOLVED / FINAL).
+- Evidence list page shows a protocol-state badge per record plus a protocol
+  filter — you can now see at a glance which claims are verified, disputed,
+  or resolved.
+- Live-verified: yuncai.site evidence list shows OBSERVED / SUPPORTED /
+  CHALLENGED / DISPUTED / RESOLVED badges across 70+ records.
+
 ## [0.5.19] - 2026-08-30
 
 ### Added — V21 extract_quote: automatic supporting-quote extraction
