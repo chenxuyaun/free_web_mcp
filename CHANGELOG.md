@@ -4,6 +4,45 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.21] - 2026-08-30
+
+### Added — V23-V27 protocol-doc gaps + reputation semantics fix
+
+Closes the five gaps between the protocol document and the codebase.
+
+- **V23 — Citation validators + challengeCount**: `CitationEnvelope.verification`
+  now carries the full validator list (agent/decision/confidence/stake/
+  reputation/model/slashed) and `challengeCount` — machine-readable Proof
+  Status. Live-verified: EV-000026 showed 3 validators + challengeCount 1.
+- **V24 — Resolution policy/version metadata**: `ClaimResolution` records
+  `resolutionPolicy` (optimistic-v1 / consensus-vote / logit-market /
+  human-arbitration) and `resolutionVersion`, persisted in SQLite and
+  exposed via citation. Live-verified: EV-000031 (CONSENSUS_VOTE,
+  consensus-vote v1.0).
+- **V25 — EXPIRED state**: claims whose challenge window lapsed without a
+  resolution become EXPIRED — a terminal state that settles no stake and
+  anchors nothing. New `expireClaim` engine function + `/api/claims/[id]/expire`
+  route + dashboard badge. Live-verified: EV-000032 EXPIRED; re-attest rejected.
+- **V26 — VERI on-chain minting + emission caps**: new `VeriClient`
+  (packages/blockchain) wraps VERI.mint; `OptimisticConfig` gains
+  `maxRewardPerAttestorWei` (per-attestor cap) and `rewardBudgetWei` (pool
+  budget with proportional scaling); finalize/arbitrate routes mint on-chain
+  VERI to settled reward recipients when `confirm:true`; validate route
+  refactored onto the shared client. **Live-verified: EV-000033 finalize
+  minted 10 VERI on-chain** (tx 0x5066e2…, Transfer from zero-address =
+  genuine mint).
+- **V27 — Historical dependency dimension**: `Attestation.historicalDependency`
+  (0..1, how often the agent has agreed with co-validators on past claims)
+  feeds `attestationCorrelation` (+0.4×avg, capped at 1.0); the web layer
+  aggregates it from the existing attestations table; exposed in citation
+  Proof Status. Live-verified: EV-000035 second validator hd=1.0 after
+  agreeing with the first on a prior claim.
+- **Fix — reputation double-write semantics**: `recordVote` now uses the same
+  running-average formula as `settleBrierReputations` instead of unbounded
+  accumulation, so both writers agree on `validators.reputation`.
+
+Test baselines: evidence 75, web 39, blockchain (anvil-gated) — all green.
+
 ## [0.5.20] - 2026-08-30
 
 ### Added — V22 evidence list shows claim protocol state
