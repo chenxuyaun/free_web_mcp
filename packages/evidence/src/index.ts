@@ -22,6 +22,7 @@ export {
   computeIndependence,
   determineResolutionTier,
   effectiveVotes,
+  logitPool,
   CLAIM_STATE_ORDER,
   CLAIM_STATE_TRANSITIONS,
   type Attestation,

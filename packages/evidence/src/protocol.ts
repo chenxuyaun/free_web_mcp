@@ -247,6 +247,34 @@ export function effectiveVotes(attestations: Attestation[]): number {
   return computeIndependence(attestations).reduce((sum, v) => sum + v, 0);
 }
 
+/** Log-odds belief pool (L3 economic dispute / prediction market, teacher
+ *  §25-§27: market-aggregated probability).
+ *
+ *  Each participant contributes a probability `p` with weight `w` (their
+ *  economic influence). Instead of a plain weighted average — which treats a
+ *  0.9 and a 0.1 as canceling to 0.5 — the pool aggregates in logit space,
+ *  where probabilities are unbounded: strong, well-funded beliefs push the
+ *  pooled price harder, exactly how a prediction market prices outcomes.
+ *
+ *  logit(p) = ln(p/(1−p)); pooled = σ(Σ w·logit(p) / Σ w).
+ *  Extreme p are clamped so logit stays finite.
+ */
+export function logitPool(entries: Array<{ p: number; w: number }>): number {
+  const EPS = 1e-9;
+  let num = 0;
+  let den = 0;
+  for (const { p, w } of entries) {
+    if (w <= 0) continue;
+    const clamped = Math.min(1 - EPS, Math.max(EPS, p));
+    const logit = Math.log(clamped / (1 - clamped));
+    num += w * logit;
+    den += w;
+  }
+  if (den === 0) return 0.5;
+  const pooled = 1 / (1 + Math.exp(-num / den));
+  return pooled;
+}
+
 /** Determine the oracle-ladder tier for a resolution (teacher §21 / §33).
  *  Higher tier = higher cost, higher finality.
  *

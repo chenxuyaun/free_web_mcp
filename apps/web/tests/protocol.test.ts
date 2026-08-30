@@ -318,7 +318,8 @@ describe("V14 DISPUTED → decisive consensus (SQLite-backed)", () => {
     const resolved = finalizeClaim(db, id, FAST);
     expect(resolved.state).toBe("RESOLVED");
     expect(resolved.resolution?.result).toBe(true);
-    expect(resolved.resolution?.method).toBe("CONSENSUS_VOTE");
+    // V18: a ladder-resolved dispute uses market-aggregated probability
+    expect(resolved.resolution?.method).toBe("PREDICTION_MARKET");
     expect(resolved.resolution?.tier).toBe("L2_AI_VALIDATORS");
     // The escalated challenge settles: challenger lost (outcome TRUE)
     expect(resolved.challenges[0].challengerWon).toBe(false);

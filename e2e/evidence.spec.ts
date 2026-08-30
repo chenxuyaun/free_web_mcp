@@ -148,7 +148,8 @@ test("protocol lifecycle: attest → challenge → finalize → RESOLVED (API + 
   });
   const fin2Body = await fin2.json();
   expect(fin2Body.state.state).toBe("RESOLVED");
-  expect(fin2Body.state.resolution.method).toBe("CONSENSUS_VOTE");
+  // V18: a ladder-resolved dispute uses market-aggregated probability
+  expect(fin2Body.state.resolution.method).toBe("PREDICTION_MARKET");
   expect(fin2Body.state.resolution.tier).toBe("L2_AI_VALIDATORS");
 
   // 6. UI shows the resolved state with tier + effective votes

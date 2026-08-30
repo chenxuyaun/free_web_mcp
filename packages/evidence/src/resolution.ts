@@ -20,6 +20,7 @@ import {
   attestationMatchesResolution,
   computeIndependence,
   determineResolutionTier,
+  logitPool,
 } from "./protocol";
 
 // ---------------------------------------------------------------------------
@@ -219,23 +220,41 @@ function consensusResolution(
     effectiveVotes += ind;
   }
 
-  const finalProbability = totalWeight > 0n
+  let finalProbability = totalWeight > 0n
     ? Number(weightedSum) / Number(totalWeight) / 1_000_000
     : 0.5;
+
+  // V18 (teacher §25-§27: L3 economic dispute = prediction market): when a
+  // claim that went through the ladder (DISPUTED) finally reaches a decisive
+  // consensus, the final probability is the LOG-ODDS belief pool — each
+  // validator's stake-weighted confidence aggregated in logit space, the way
+  // a prediction market prices an outcome — not a plain weighted average.
+  const fromDispute = claim.state === "DISPUTED";
+  if (fromDispute) {
+    const entries = claim.attestations.map((att, i) => {
+      const rep = Math.min(1, Math.max(0, att.reputation ?? 0));
+      // stake scaled to VERI units so the weight stays in float precision
+      const stakeVeri = Number(BigInt(att.stake) / 10n ** 18n);
+      return { p: att.confidence, w: stakeVeri * independence[i] * (1 + rep) };
+    });
+    finalProbability = logitPool(entries);
+  }
 
   // V13 (teacher §21/§33 oracle ladder): a knife-edge dispute is NOT a
   // resolution. When the weighted consensus lands in the disputed band
   // (|p−0.5| < 0.1 → L3, < 0.05 → L4), a coin-flip at 0.5 would manufacture
   // certainty — instead the claim escalates: outcome is INDETERMINATE until
   // the next, more expensive tier (prediction market / human expert) decides.
-  const tier = determineResolutionTier(claim, finalProbability, "CONSENSUS_VOTE");
+  const tier = determineResolutionTier(claim, finalProbability, fromDispute ? "PREDICTION_MARKET" : "CONSENSUS_VOTE");
   const escalated = tier === "L3_ECONOMIC_DISPUTE" || tier === "L4_HUMAN_EXPERT";
   const result: boolean | null = escalated ? null : finalProbability > 0.5;
   const method: ClaimResolution["method"] = escalated
     ? tier === "L4_HUMAN_EXPERT"
       ? "HUMAN_ARBITRATION"
       : "PREDICTION_MARKET"
-    : "CONSENSUS_VOTE";
+    : fromDispute
+      ? "PREDICTION_MARKET" // L3 economic dispute resolved by market aggregation
+      : "CONSENSUS_VOTE";
 
   // Mark attestations as correct or incorrect (indeterminate → no slash,
   // no reward — matches attestationMatchesResolution(null) = null).

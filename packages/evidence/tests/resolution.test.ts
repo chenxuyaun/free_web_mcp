@@ -8,6 +8,7 @@ import {
   computeIndependence,
   determineResolutionTier,
   effectiveVotes,
+  logitPool,
   logScore,
   nextClaimState,
   attestationMatchesResolution,
@@ -577,7 +578,9 @@ describe("V2 independence scoring", () => {
 
       expect(resolved.state).toBe("RESOLVED");
       expect(resolved.resolution?.result).toBe(true);
-      expect(resolved.resolution?.method).toBe("CONSENSUS_VOTE");
+      // V18: a dispute resolved through the ladder uses market-aggregated
+      // probability (log-odds belief pool) — the method is PREDICTION_MARKET.
+      expect(resolved.resolution?.method).toBe("PREDICTION_MARKET");
       expect(resolved.resolution?.tier).toBe("L2_AI_VALIDATORS");
       // The challenge finally settles: challenger lost (outcome TRUE)
       expect(resolved.challenges[0].challengerWon).toBe(false);
@@ -589,6 +592,59 @@ describe("V2 independence scoring", () => {
       const later = new Date(Date.now() + 120_000).toISOString();
       const resolved = finalizeResolution(attested, SHORT_WINDOW, later);
       expect(resolved.resolution?.tier).toBe("L2_AI_VALIDATORS");
+    });
+  });
+
+  describe("V18 log-odds belief pool (prediction market, teacher §25-§27)", () => {
+    it("single entry returns its probability", () => {
+      expect(logitPool([{ p: 0.9, w: 1 }])).toBeCloseTo(0.9, 5);
+    });
+
+    it("two equal-weight entries average to 0.5", () => {
+      expect(logitPool([{ p: 0.9, w: 1 }, { p: 0.1, w: 1 }])).toBeCloseTo(0.5, 5);
+    });
+
+    it("strongly weighted entry dominates", () => {
+      const p = logitPool([
+        { p: 0.9, w: 100 },
+        { p: 0.5, w: 1 },
+      ]);
+      // logit(0.9)=2.197, logit(0.5)=0 → average = 2.197*100/101 ≈ 2.175 → sigmoid ≈ 0.898
+      expect(p).toBeGreaterThan(0.89);
+      expect(p).toBeLessThan(0.9);
+    });
+
+    it("extreme beliefs pull the pool harder than weighted average", () => {
+      // Two almost-identical 0.99 and one 0.01:
+      // Weighted average: (0.99+0.99+0.01)/3 = 0.663
+      // Logit pool: logit(0.99)=4.595, logit(0.01)=-4.595
+      //   avg logit = (4.595+4.595-4.595)/3 = 1.532 → sigmoid = 0.822
+      // The two strong 0.99 beliefs pull the pool harder in logit space.
+      const avg = (0.99 + 0.99 + 0.01) / 3;
+      const pool = logitPool([
+        { p: 0.99, w: 1 },
+        { p: 0.99, w: 1 },
+        { p: 0.01, w: 1 },
+      ]);
+      expect(pool).toBeGreaterThan(avg);
+      expect(pool).toBeCloseTo(0.822, 2);
+    });
+
+    it("zero-weight entries are ignored", () => {
+      const p = logitPool([
+        { p: 0.9, w: 0 },
+        { p: 0.1, w: 1 },
+      ]);
+      expect(p).toBeCloseTo(0.1, 5);
+    });
+
+    it("empty entries return 0.5 (no information)", () => {
+      expect(logitPool([])).toBe(0.5);
+    });
+
+    it("negative weight is ignored (treated as ≤ 0)", () => {
+      const p = logitPool([{ p: 0.9, w: -5 }, { p: 0.1, w: 1 }]);
+      expect(p).toBeCloseTo(0.1, 5);
     });
   });
 });
