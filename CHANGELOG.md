@@ -4,6 +4,19 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.18] - 2026-08-30
+
+### Added — V20 MCP arbitrate_claim: agents complete the oracle ladder
+
+- New `arbitrate_claim` MCP tool → **15 total**. An expert (human or agent)
+  can adjudicate a DISPUTED claim (L4), settling attestations/challenges
+  and optionally anchoring on-chain.
+- An AI agent can now run the ENTIRE verification lifecycle through MCP:
+  create → attest → challenge → finalize → verify → arbitrate.
+- Live-verified: EV-000030 — created, attested (knife-edge), challenged,
+  finalized to DISPUTED, arbitrated FALSE via MCP → HUMAN_ARBITRATION/L4.
+- 58 MCP tests pass.
+
 ## [0.5.17] - 2026-08-30
 
 ### Added — V19 human-expert arbitration (teacher §21/§33, L4)
