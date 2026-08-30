@@ -64,7 +64,9 @@ export function ensureProtocolSchema(db: Db): void {
       state          TEXT NOT NULL,
       created_at     TEXT NOT NULL,
       resolved_at    TEXT,
-      challenger_won INTEGER
+      challenger_won INTEGER,
+      bond_slashed   INTEGER,
+      bond_reward    TEXT
     );
 
     CREATE TABLE IF NOT EXISTS resolutions (
@@ -102,6 +104,15 @@ export function ensureProtocolSchema(db: Db): void {
   }
   if (!attCols.some((c) => c.name === "reputation")) {
     db.exec("ALTER TABLE attestations ADD COLUMN reputation REAL");
+  }
+
+  // Migration: challenge bond settlement columns (V6)
+  const chlCols = db.prepare("PRAGMA table_info(challenges)").all() as Array<{ name: string }>;
+  if (!chlCols.some((c) => c.name === "bond_slashed")) {
+    db.exec("ALTER TABLE challenges ADD COLUMN bond_slashed INTEGER");
+  }
+  if (!chlCols.some((c) => c.name === "bond_reward")) {
+    db.exec("ALTER TABLE challenges ADD COLUMN bond_reward TEXT");
   }
 }
 
@@ -192,6 +203,8 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
     createdAt: String(c.created_at),
     resolvedAt: c.resolved_at ? String(c.resolved_at) : undefined,
     challengerWon: c.challenger_won === null ? undefined : Boolean(c.challenger_won),
+    bondSlashed: c.bond_slashed === null ? undefined : Boolean(c.bond_slashed),
+    bondReward: c.bond_reward ? String(c.bond_reward) : undefined,
   }));
 
   const res = db
@@ -283,8 +296,9 @@ function saveState(db: Db, state: ClaimResolutionState): void {
   // Challenges: upsert
   const upsertChl = db.prepare(
     `INSERT OR REPLACE INTO challenges
-       (id, evidence_id, challenger, bond, reason, state, created_at, resolved_at, challenger_won)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, evidence_id, challenger, bond, reason, state, created_at, resolved_at, challenger_won,
+        bond_slashed, bond_reward)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const c of state.challenges) {
     upsertChl.run(
@@ -297,6 +311,8 @@ function saveState(db: Db, state: ClaimResolutionState): void {
       c.createdAt,
       c.resolvedAt ?? null,
       c.challengerWon === undefined ? null : c.challengerWon ? 1 : 0,
+      c.bondSlashed === undefined ? null : c.bondSlashed ? 1 : 0,
+      c.bondReward ?? null,
     );
   }
 
@@ -397,6 +413,10 @@ export function finalizeClaim(
   // strictly proper scoring rule (Brier), rewarding calibration not just
   // correctness (teacher §9).
   settleBrierReputations(db, state);
+  // V6: settle challenge bonds — a loser forfeits their bond, a winner gets
+  // it back plus a reward; both get reputation updates (teacher's
+  // economically-risked judgment: challenges must hurt when wrong).
+  settleChallengeBonds(db, state, config);
   return state;
 }
 
@@ -421,6 +441,47 @@ export function settleBrierReputations(db: Db, state: ClaimResolutionState): voi
          reputation = (reputation * total_votes + ?) / (total_votes + 1),
          total_votes = total_votes + 1`,
     ).run(att.agent.toLowerCase(), score, new Date().toISOString(), score);
+  }
+}
+
+/** Settle challenge bond economics (V6, teacher's economically-risked judgment).
+ *  A winning challenger gets their bond back plus a reward and a reputation
+ *  bump; a losing challenger forfeits the bond and gets a reputation hit. */
+export function settleChallengeBonds(db: Db, state: ClaimResolutionState, config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG): void {
+  for (let i = 0; i < state.challenges.length; i++) {
+    const ch = state.challenges[i];
+    if (ch.challengerWon === undefined) continue; // not settled
+
+    const won = ch.challengerWon;
+    const bond = BigInt(ch.bond);
+    const reward = won
+      ? (bond * BigInt(Math.round(config.challengerRewardFraction * 1_000)) / 1000n).toString()
+      : "0";
+    const slashed = !won;
+
+    // Persist bond outcome on the challenge row + the returned state so the
+    // API response reflects the settlement.
+    db.prepare("UPDATE challenges SET bond_slashed = ?, bond_reward = ? WHERE id = ?")
+      .run(slashed ? 1 : 0, reward, ch.id);
+    state.challenges[i] = { ...ch, bondSlashed: slashed, bondReward: reward };
+
+    // Update validator stats: win = +1 successful_challenge, lose = 0
+    const challengeScore = won ? 1.0 : 0.0;
+    db.prepare(
+      `INSERT INTO validators (address, reputation, verified_claims, successful_challenges, total_votes, created_at)
+       VALUES (?, ?, 0, ?, 1, ?)
+       ON CONFLICT(address) DO UPDATE SET
+         reputation = (reputation * total_votes + ?) / (total_votes + 1),
+         successful_challenges = successful_challenges + ?,
+         total_votes = total_votes + 1`,
+    ).run(
+      ch.challenger.toLowerCase(),
+      challengeScore,
+      won ? 1 : 0,
+      new Date().toISOString(),
+      challengeScore,
+      won ? 1 : 0,
+    );
   }
 }
 

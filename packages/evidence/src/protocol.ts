@@ -112,6 +112,12 @@ export interface Challenge {
   resolvedAt?: string;
   /** TRUE if the challenger was right (the original attestation was wrong). */
   challengerWon?: boolean;
+  /** Bond economic outcome after settlement (V6): TRUE = bond forfeited
+   *  (challenger was wrong), FALSE = returned. */
+  bondSlashed?: boolean;
+  /** Reward minted to the challenger on a successful challenge (V6),
+   *  wei — challengerRewardFraction × bond. */
+  bondReward?: string;
 }
 
 // ---------------------------------------------------------------------------

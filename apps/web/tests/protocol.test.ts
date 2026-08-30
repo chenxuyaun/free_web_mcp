@@ -223,3 +223,59 @@ describe("V2 independence-weighted consensus (SQLite-backed)", () => {
     expect(reloaded?.resolution?.tier).toBe("L4_HUMAN_EXPERT");
   });
 });
+
+describe("V6 challenge bond settlement (SQLite-backed)", () => {
+  it("losing challenger forfeits bond and gets no successful_challenges", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // Challenger bonds against a claim that resolves FALSE → challenger wins
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    const challenger = "0x9999999999999999999999999999999999999999";
+    challengeClaim(db, id, { challenger, bond: "50000000000000000000", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    expect(state.resolution?.result).toBe(true); // SUPPORTED 0.9 alone → TRUE
+    const chl = state.challenges[0];
+    // Challenger lost (result TRUE, they said FALSE) → bond slashed, no reward
+    expect(chl.challengerWon).toBe(false);
+    expect(chl.bondSlashed).toBe(true);
+    expect(chl.bondReward).toBe("0");
+
+    // Reload — bond outcome persists
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded?.challenges[0].bondSlashed).toBe(true);
+
+    // Validator stats: challenger has 0 successful challenges
+    const stats = getValidatorStats(challenger, dbPath);
+    expect(stats?.successfulChallenges).toBe(0);
+  });
+
+  it("winning challenger gets bond reward + reputation bump and successful_challenges", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // Two diverse agents: SUPPORTED 0.2 vs CONTRADICTED 0.8 → resolves FALSE
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.2, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.8, stake: "100000000000000000000", model: "claude" }, FAST);
+
+    const challenger = "0x9999999999999999999999999999999999999999";
+    challengeClaim(db, id, { challenger, bond: "50000000000000000000", reason: "the truth is FALSE" });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    expect(state.resolution?.result).toBe(false);
+    const chl = state.challenges[0];
+    expect(chl.challengerWon).toBe(true);
+    expect(chl.bondSlashed).toBe(false);
+    // challengerRewardFraction 0.1 × bond 50 → 5 VERI reward
+    expect(chl.bondReward).toBe("5000000000000000000");
+
+    const stats = getValidatorStats(challenger, dbPath);
+    expect(stats?.successfulChallenges).toBe(1);
+    expect(stats?.reputation).toBeCloseTo(1.0, 5);
+  });
+});
