@@ -187,6 +187,20 @@ export interface CitationEnvelope {
     finalProbability: number;
     resolutionId?: string;
   };
+  /** Verification provenance (teacher doc: Proof Status is machine-readable). */
+  verification: {
+    /** Validators who attested on this claim, with their staked judgment. */
+    validators: Array<{
+      agent: string;
+      decision: AttestationDecision;
+      confidence: number;
+      stake: string;
+      reputation?: number;
+      model?: string;
+      slashed?: boolean;
+    }>;
+    challengeCount: number;
+  };
   /** Chain anchor of the claim's evidence hash. */
   anchor?: {
     evidenceHash: string;

@@ -6,12 +6,14 @@ import { buildEvidencePackage, sha256, type EvidenceSource } from "@free-web-mcp
 import {
   closeDb,
   countEvidence,
+  getDb,
   getEvidencePackage,
   getStats,
   insertEvidence,
   listEvidence,
   markAnchored,
 } from "../lib/db";
+import { attestClaim, challengeClaim } from "../lib/protocol-db";
 
 const tmpDirs: string[] = [];
 
@@ -163,5 +165,37 @@ describe("evidence db layer", () => {
     // Fresh evidence auto-initializes a claim in OBSERVED
     const items = listEvidence(dbPath);
     expect(items.find((i) => i.id === saved.id)?.protocolState).toBe("OBSERVED");
+  });
+
+  it("V23: citation envelope carries validators + challengeCount", async () => {
+    const dbPath = makeDbPath();
+    const saved = insertEvidence(makePkg("Citation validators"), dbPath);
+
+    const db = getDb(dbPath);
+    attestClaim(db, saved.id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" });
+    attestClaim(db, saved.id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.2, stake: "50000000000000000000", model: "claude" });
+    challengeClaim(db, saved.id, { challenger: "0xccc", bond: "100", reason: "dispute" });
+
+    // Route reads DB via DB_PATH env — point it at the temp db.
+    const oldDbPath = process.env.DB_PATH;
+    process.env.DB_PATH = dbPath;
+    try {
+      const { GET } = await import("../app/api/claims/[id]/citation/route");
+      const res = await GET(new Request("http://localhost/api/claims/x/citation"), { params: { id: saved.id } });
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      const c = body.citation;
+      expect(c.verification.validators).toHaveLength(2);
+      expect(c.verification.validators[0]).toMatchObject({
+        agent: "0xaaa",
+        decision: "SUPPORTED",
+        confidence: 0.9,
+        model: "gpt-4o",
+      });
+      expect(c.verification.challengeCount).toBe(1);
+    } finally {
+      if (oldDbPath === undefined) delete process.env.DB_PATH;
+      else process.env.DB_PATH = oldDbPath;
+    }
   });
 });

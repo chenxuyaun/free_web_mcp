@@ -49,6 +49,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       finalProbability: state?.resolution?.finalProbability ?? pkg.assessment.confidence,
       resolutionId: state?.resolution?.id,
     },
+    // V23: machine-readable Proof Status — who attested, with what stake,
+    // and how many challenges were raised (teacher doc).
+    verification: {
+      validators: (state?.attestations ?? []).map((a) => ({
+        agent: a.agent,
+        decision: a.decision,
+        confidence: a.confidence,
+        stake: a.stake,
+        reputation: a.reputation,
+        model: a.model,
+        slashed: a.slashed,
+      })),
+      challengeCount: state?.challenges.length ?? 0,
+    },
     ...(pkg.blockchain?.evidenceHash
       ? {
           anchor: {
