@@ -8,6 +8,7 @@ import {
   arbitrateClaim,
   attestClaim,
   challengeClaim,
+  collectRewardRecipients,
   computeResolutionRoot,
   expireClaim,
   finalizeClaim,
@@ -566,5 +567,57 @@ describe("V10 proper scoring rules (teacher §9-§10)", () => {
     const stats = getValidatorStats(agent, dbPath)!;
     // exp(−log(1)) = 1.0
     expect(stats.reputation).toBeCloseTo(1.0, 5);
+  });
+});
+
+describe("V26 VERI emission caps (SQLite-backed)", () => {
+  const WALLET_A = "0x60a0Ee9e28b609B740A3588121C7C2B34FE64eF4";
+
+  it("collectRewardRecipients returns settled attestor rewards with valid 0x addresses", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    attestClaim(db, id, { agent: WALLET_A, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    await new Promise((r) => setTimeout(r, 1100));
+    const state = finalizeClaim(db, id, FAST);
+
+    const recipients = collectRewardRecipients(state);
+    // 10% of 100 VERI = 10 VERI minted to the sole correct attestor
+    expect(recipients).toHaveLength(1);
+    expect(recipients[0]).toMatchObject({ to: WALLET_A, kind: "attestor" });
+    expect(recipients[0].amount).toBe(10000000000000000000n); // 10 VERI
+  });
+
+  it("collectRewardRecipients ignores non-address agents (no mint target)", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // "0xaaa" is not a real 40-hex address → not a mint recipient
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    await new Promise((r) => setTimeout(r, 1100));
+    const state = finalizeClaim(db, id, FAST);
+
+    expect(collectRewardRecipients(state)).toHaveLength(0);
+  });
+
+  it("challenger reward is emission-capped by maxRewardPerAttestorWei", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+    const capped = { ...FAST, maxRewardPerAttestorWei: 1000000000000000000n }; // 1 VERI cap
+
+    // A single CONTRADICTED attestation (confidence 0.1) → result FALSE,
+    // so the challenger (who claimed the attestation was wrong) wins.
+    attestClaim(db, id, { agent: WALLET_A, decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000" }, FAST);
+    challengeClaim(db, id, { challenger: WALLET_A, bond: "100000000000000000000", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+    const state = finalizeClaim(db, id, capped);
+
+    // Bond reward = 10% of 100 = 10 VERI, but capped at 1 VERI
+    const ch = state.challenges[0];
+    expect(ch.challengerWon).toBe(true);
+    expect(ch.bondReward).toBe("1000000000000000000");
   });
 });

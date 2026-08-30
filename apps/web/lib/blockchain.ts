@@ -1,6 +1,6 @@
 import "server-only";
 
-import { anvil, bscTestnet, EvidenceRegistryClient } from "@free-web-mcp/blockchain";
+import { anvil, bscTestnet, EvidenceRegistryClient, VeriClient } from "@free-web-mcp/blockchain";
 import type { Chain, Hex } from "viem";
 
 export interface RegistryConfig {
@@ -35,12 +35,34 @@ export function getRegistryConfig(): RegistryConfig {
 }
 
 /** Lazily-created singleton so every request doesn't spin a new viem client. */
-const globalForBlockchain = globalThis as unknown as { __registryClient?: EvidenceRegistryClient };
+const globalForBlockchain = globalThis as unknown as {
+  __registryClient?: EvidenceRegistryClient;
+  __veriClient?: VeriClient;
+};
 
 export function getRegistryClient(): EvidenceRegistryClient {
   if (globalForBlockchain.__registryClient) return globalForBlockchain.__registryClient;
   const cfg = getRegistryConfig();
   const client = new EvidenceRegistryClient(cfg);
   globalForBlockchain.__registryClient = client;
+  return client;
+}
+
+/** V26: lazily-created VeriClient singleton for on-chain VERI minting.
+ *  Requires VERI_TOKEN_ADDRESS, BSC_RPC_URL, and WALLET_PRIVATE_KEY. */
+export function getVeriClient(): VeriClient {
+  if (globalForBlockchain.__veriClient) return globalForBlockchain.__veriClient;
+  const rpcUrl = process.env.BSC_RPC_URL;
+  const veriAddress = process.env.VERI_TOKEN_ADDRESS;
+  if (!rpcUrl || !veriAddress) {
+    throw new Error("VERI minting not configured — set BSC_RPC_URL and VERI_TOKEN_ADDRESS in .env");
+  }
+  const client = new VeriClient({
+    rpcUrl,
+    chain: resolveChain(process.env.BSC_NETWORK),
+    veriAddress: veriAddress as Hex,
+    privateKey: (process.env.WALLET_PRIVATE_KEY || undefined) as Hex | undefined,
+  });
+  globalForBlockchain.__veriClient = client;
   return client;
 }

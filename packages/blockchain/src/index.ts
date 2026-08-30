@@ -6,6 +6,7 @@ export {
   ANVIL_PRIVATE_KEY,
 } from "./chains";
 export { EvidenceRegistryClient } from "./registry";
+export { VeriClient, VERI_ABI } from "./veri";
 export {
   AgentIdentityClient,
   ReputationClient,

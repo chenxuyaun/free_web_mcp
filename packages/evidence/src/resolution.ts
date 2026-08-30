@@ -39,6 +39,13 @@ export interface OptimisticConfig {
   challengerRewardFraction: number;
   /** Maximum number of attestations for a single claim (to prevent spam). */
   maxAttestations: number;
+  /** V26 emission cap: max VERI (wei) minted to a single attestor/challenger
+   *  per settlement. 0 (default) = uncapped, fraction-only. */
+  maxRewardPerAttestorWei?: bigint;
+  /** V26 emission budget: total VERI (wei) minted per finalize across the
+   *  reward pool. When the pool exceeds the budget, every reward scales down
+   *  proportionally. 0 (default) = unlimited. */
+  rewardBudgetWei?: bigint;
 }
 
 export const DEFAULT_OPTIMISTIC_CONFIG: OptimisticConfig = {
@@ -48,6 +55,26 @@ export const DEFAULT_OPTIMISTIC_CONFIG: OptimisticConfig = {
   challengerRewardFraction: 0.1, // 10% of bond minted as reward
   maxAttestations: 10,
 };
+
+/** V26 emission caps: clamp each reward at maxRewardPerAttestorWei, then if
+ *  the total pool exceeds rewardBudgetWei, scale every reward down
+ *  proportionally so a single finalize can never emit more than the budget.
+ *  Pure function — the caller decides what to mint. */
+export function applyEmissionCaps(rewards: bigint[], config: OptimisticConfig): bigint[] {
+  const cap = config.maxRewardPerAttestorWei ?? 0n;
+  const budget = config.rewardBudgetWei ?? 0n;
+
+  let out = rewards;
+  if (cap > 0n) {
+    out = out.map((r) => (r > cap ? cap : r));
+  }
+
+  const total = out.reduce((s, r) => s + r, 0n);
+  if (budget > 0n && total > budget) {
+    out = out.map((r) => (r * budget) / total);
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // Claim state machine — the resolution engine
@@ -146,7 +173,7 @@ export function finalizeResolution(
     if (timestamp < claim.challengeDeadline) {
       throw new Error("Challenge window has not closed yet");
     }
-    return optimisticFinalize(claim, now);
+    return optimisticFinalize(claim, config, now);
   }
 
   if (claim.state === "CHALLENGED" || claim.state === "DISPUTED") {
@@ -162,6 +189,7 @@ export function finalizeResolution(
 
 function optimisticFinalize(
   claim: ClaimResolutionState,
+  config: OptimisticConfig,
   now: string,
 ): ClaimResolutionState {
   // The first attestation's confidence becomes the final probability
@@ -183,9 +211,28 @@ function optimisticFinalize(
     resolutionVersion: "1.0",
   };
 
+  // V26: an unchallenged finalize still settles the attestor — mark the
+  // attestation settled with its (capped) reward so the route can mint VERI.
+  const rawRewards = claim.attestations.map((att) =>
+    attestationMatchesResolution(att.decision, result) === true
+      ? (BigInt(att.stake) * BigInt(Math.round(config.attestorRewardFraction * 1_000)) / 1000n)
+      : 0n,
+  );
+  const rewards = applyEmissionCaps(rawRewards, config);
+  const updatedAttestations = claim.attestations.map((att, i) => {
+    const matches = attestationMatchesResolution(att.decision, result);
+    return {
+      ...att,
+      settledAt: now,
+      slashed: matches === false,
+      reward: rewards[i].toString(),
+    };
+  });
+
   return {
     ...claim,
     state: "RESOLVED",
+    attestations: updatedAttestations,
     resolution,
     updatedAt: now,
   };
@@ -260,15 +307,21 @@ function consensusResolution(
 
   // Mark attestations as correct or incorrect (indeterminate → no slash,
   // no reward — matches attestationMatchesResolution(null) = null).
-  const updatedAttestations = claim.attestations.map((att) => {
+  // V26: raw rewards pass through emission caps (per-attestor cap + pool
+  // budget) so a single finalize can never mint more than the budget.
+  const rawRewards = claim.attestations.map((att) =>
+    attestationMatchesResolution(att.decision, result) === true
+      ? (BigInt(att.stake) * BigInt(Math.round(config.attestorRewardFraction * 1_000)) / 1000n)
+      : 0n,
+  );
+  const rewards = applyEmissionCaps(rawRewards, config);
+  const updatedAttestations = claim.attestations.map((att, i) => {
     const matches = attestationMatchesResolution(att.decision, result);
     return {
       ...att,
       settledAt: now,
       slashed: matches === false,
-      reward: matches === true
-        ? (BigInt(att.stake) * BigInt(Math.round(config.attestorRewardFraction * 1_000)) / 1000n).toString()
-        : "0",
+      reward: rewards[i].toString(),
     };
   });
 
@@ -391,15 +444,21 @@ export function arbitrateResolution(
   }
 
   const result = ruling.result;
-  const updatedAttestations = claim.attestations.map((att) => {
+  // V26: raw rewards pass through emission caps (per-attestor cap + pool
+  // budget) so an arbitration can never mint more than the budget.
+  const rawRewards = claim.attestations.map((att) =>
+    attestationMatchesResolution(att.decision, result) === true
+      ? (BigInt(att.stake) * BigInt(Math.round(config.attestorRewardFraction * 1_000)) / 1000n)
+      : 0n,
+  );
+  const rewards = applyEmissionCaps(rawRewards, config);
+  const updatedAttestations = claim.attestations.map((att, i) => {
     const matches = attestationMatchesResolution(att.decision, result);
     return {
       ...att,
       settledAt: now,
       slashed: matches === false,
-      reward: matches === true
-        ? (BigInt(att.stake) * BigInt(Math.round(config.attestorRewardFraction * 1_000)) / 1000n).toString()
-        : "0",
+      reward: rewards[i].toString(),
     };
   });
 

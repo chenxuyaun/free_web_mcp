@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getRegistryClient } from "@/lib/blockchain";
+import { getRegistryClient, getVeriClient } from "@/lib/blockchain";
 import { getDb, markAnchored } from "@/lib/db";
-import { arbitrateClaim, computeResolutionRoot } from "@/lib/protocol-db";
+import { arbitrateClaim, collectRewardRecipients, computeResolutionRoot } from "@/lib/protocol-db";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,9 @@ interface ArbitrateBody {
 
 /** POST /api/claims/[id]/arbitrate — L4 human-expert arbitration (V19).
  *  Only DISPUTED claims are arbitrable: the expert's ruling produces a
- *  HUMAN_ARBITRATION resolution that settles attestations and challenges. */
+ *  HUMAN_ARBITRATION resolution that settles attestations and challenges.
+ *  With confirm:true, anchors the resolution on-chain and mints VERI rewards
+ *  (V26 emission caps apply). */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const rl = rateLimit(request, { limit: 30, windowMs: 60_000 });
   if (!rl.ok) {
@@ -72,6 +74,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     let blockNumber: number | null = null;
     let resolutionRoot: string | null = null;
 
+    const rewards: Array<{ to: string; amount: string; kind: string; txHash: string }> = [];
+
     if (body.confirm === true) {
       resolutionRoot = computeResolutionRoot(state);
       const client = getRegistryClient();
@@ -92,6 +96,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
         txHash: anchor.txHash,
         uri: `free-web-mcp://evidence/${params.id}/arbitration`,
       });
+
+      // V26: mint on-chain VERI to every settled reward recipient.
+      const veri = getVeriClient();
+      for (const r of collectRewardRecipients(state)) {
+        const mint = await veri.mint(r.to as `0x${string}`, r.amount);
+        rewards.push({ to: r.to, amount: r.amount.toString(), kind: r.kind, txHash: mint.txHash });
+      }
     }
 
     return NextResponse.json({
@@ -105,6 +116,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         blockNumber,
         resolutionRoot,
       },
+      rewards,
     });
   } catch (e) {
     return NextResponse.json(

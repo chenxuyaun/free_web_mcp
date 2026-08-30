@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { getRegistryClient } from "@/lib/blockchain";
+import { getRegistryClient, getVeriClient } from "@/lib/blockchain";
 import { getDb, markAnchored } from "@/lib/db";
-import { computeResolutionRoot, finalizeClaim, loadClaimState, type ScoringRule } from "@/lib/protocol-db";
+import {
+  collectRewardRecipients,
+  computeResolutionRoot,
+  finalizeClaim,
+  loadClaimState,
+  type ScoringRule,
+} from "@/lib/protocol-db";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +22,8 @@ interface FinalizeBody {
 
 /** POST /api/claims/[id]/finalize — close the challenge window, produce a
  *  resolution, and (with confirm:true) anchor it on-chain via
- *  resolveClaim(claimHash, result, method, resolutionRoot). */
+ *  resolveClaim(claimHash, result, method, resolutionRoot) and mint VERI
+ *  rewards to the settled attestors/challengers (V26 emission caps apply). */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const rl = rateLimit(request, { limit: 30, windowMs: 60_000 });
   if (!rl.ok) {
@@ -67,6 +74,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     // certainty. Skip the write and surface the escalation instead.
     const indeterminate = res.result === null;
 
+    const rewards: Array<{ to: string; amount: string; kind: string; txHash: string }> = [];
+
     if (body.confirm === true && !indeterminate) {
       // Compute the resolution root: sha256 over attestations + challenges +
       // outcome (teacher §21: merkle-style root so settlement is recomputable).
@@ -95,6 +104,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
         txHash: anchor.txHash,
         uri: `free-web-mcp://evidence/${params.id}/resolution`,
       });
+
+      // V26: mint on-chain VERI to every settled reward recipient (the
+      // emission caps in the engine/settle logic already bounded the amounts).
+      const veri = getVeriClient();
+      for (const r of collectRewardRecipients(state)) {
+        const mint = await veri.mint(r.to as `0x${string}`, r.amount);
+        rewards.push({ to: r.to, amount: r.amount.toString(), kind: r.kind, txHash: mint.txHash });
+      }
     }
 
     return NextResponse.json({
@@ -110,6 +127,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         escalated: indeterminate,
         escalation: indeterminate ? res.method : null,
       },
+      rewards,
     });
   } catch (e) {
     return NextResponse.json(

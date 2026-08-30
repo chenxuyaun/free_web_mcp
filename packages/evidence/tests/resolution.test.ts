@@ -15,6 +15,7 @@ import {
   type Attestation,
 } from "../src/protocol";
 import {
+  applyEmissionCaps,
   arbitrateResolution,
   submitAttestation,
   submitChallenge,
@@ -707,17 +708,87 @@ describe("V19 human-expert arbitration", () => {
     expect(resolved.challenges[0].challengerWon).toBe(false);
   });
 
-  it("expert ruling FALSE rewards the challenger (UPHELD)", () => {
-    const disputed = makeDisputedClaim();
-    const resolved = arbitrateResolution(disputed, {
-      result: false,
-      expert: "0xdeadbeef",
-      rationale: "The sources do not support the claim",
-    }, SHORT_WINDOW);
+it("expert ruling FALSE rewards the challenger (UPHELD)", () => {
+	    const disputed = makeDisputedClaim();
+	    const resolved = arbitrateResolution(disputed, {
+	      result: false,
+	      expert: "0xdeadbeef",
+	      rationale: "The sources do not support the claim",
+	    }, SHORT_WINDOW);
 
-    expect(resolved.resolution?.result).toBe(false);
-    expect(resolved.resolution?.finalProbability).toBe(0);
-    // Challenger claimed FALSE → now upheld
-    expect(resolved.challenges[0].challengerWon).toBe(true);
-  });
-});
+	    expect(resolved.resolution?.result).toBe(false);
+	    expect(resolved.resolution?.finalProbability).toBe(0);
+	    // Challenger claimed FALSE → now upheld
+	    expect(resolved.challenges[0].challengerWon).toBe(true);
+	  });
+	});
+
+	describe("V26 emission caps (per-attestor cap + pool budget)", () => {
+	  const CAP_WINDOW: OptimisticConfig = {
+	    ...DEFAULT_OPTIMISTIC_CONFIG,
+	    challengeWindowSec: 60,
+	    challengeBondMultiplier: 1.0,
+	    attestorRewardFraction: 0.1,
+	    challengerRewardFraction: 0.1,
+	  };
+
+	  it("applyEmissionCaps clamps each reward at maxRewardPerAttestorWei", () => {
+	    const config = { ...DEFAULT_OPTIMISTIC_CONFIG, maxRewardPerAttestorWei: 100n };
+	    const raw = [200n, 50n, 300n, 25n];
+	    const capped = applyEmissionCaps(raw, config);
+	    // 200 > 100 → 100; 50 ≤ 100 → 50; 300 > 100 → 100; 25 ≤ 100 → 25
+	    expect(capped).toEqual([100n, 50n, 100n, 25n]);
+	  });
+
+	  it("applyEmissionCaps scales proportionally when budget is exceeded", () => {
+	    const config = { ...DEFAULT_OPTIMISTIC_CONFIG, rewardBudgetWei: 100n };
+	    const raw = [200n, 200n]; // total 400 → budget 100, scale 0.25×
+	    const scaled = applyEmissionCaps(raw, config);
+	    expect(scaled[0]).toBe(50n); // 200 * 100 / 400 = 50
+	    expect(scaled[1]).toBe(50n);
+	  });
+
+	  it("applyEmissionCaps with no cap or budget passes unchanged", () => {
+	    const config = { ...DEFAULT_OPTIMISTIC_CONFIG };
+	    const raw = [100n, 200n, 300n];
+	    expect(applyEmissionCaps(raw, config)).toEqual(raw);
+	  });
+
+	  it("cap + budget together: cap then scale", () => {
+	    const config = { ...DEFAULT_OPTIMISTIC_CONFIG, maxRewardPerAttestorWei: 150n, rewardBudgetWei: 120n };
+	    const raw = [200n, 100n]; // cap → [150n, 100n] total 250 → budget 120, scale 0.48×
+	    const [a, b] = applyEmissionCaps(raw, config);
+	    expect(a).toBe(72n);  // 150 * 120 / 250 = 72
+	    expect(b).toBe(48n);  // 100 * 120 / 250 = 48
+	  });
+
+	  it("optimistic finalize with cap limits the attestor reward", () => {
+	    const claim = makeClaim();
+	    const att = makeAttestation({ stake: "100000000000000000000" }); // 100 VERI
+	    const attested = submitAttestation(claim, att, CAP_WINDOW);
+	    const config = { ...CAP_WINDOW, maxRewardPerAttestorWei: 1234567890000000000n }; // tiny cap < 10% of 100
+	    const later = new Date(Date.now() + 120_000).toISOString();
+	    const resolved = finalizeResolution(attested, config, later);
+	    const reward = BigInt(resolved.attestations[0].reward ?? "0");
+	    expect(reward).toBe(1234567890000000000n); // capped
+	  });
+
+	  it("consensus resolution with budget scales rewards proportionally", () => {
+	    const claim = makeClaim();
+	    const att1 = makeAttestation({ agent: "0x1111111111111111111111111111111111111111", decision: "SUPPORTED", confidence: 0.9, stake: "50000000000000000000" });
+	    const att2 = makeAttestation({ id: "att-2", agent: "0x2222222222222222222222222222222222222222", decision: "SUPPORTED", confidence: 0.8, stake: "50000000000000000000" });
+	    const attested = submitAttestation(claim, att1, CAP_WINDOW);
+	    const attested2 = submitAttestation(attested, att2, CAP_WINDOW);
+	    // Challenge to force consensus path
+	    const challenged = submitChallenge(attested2, { id: "chl-1", claimId: "claim-1", challenger: "0xchal", bond: "10000000000000000000", state: "OPEN", createdAt: "2026-08-29T00:00:00.000Z" });
+	    const later = new Date(Date.now() + 120_000).toISOString();
+	    // Budget: 10% of 50+50 = 10 VERI, but budget only 2 VERI → scale
+	    const config = { ...CAP_WINDOW, rewardBudgetWei: 2000000000000000000n };
+	    const resolved = finalizeResolution(challenged, config, later);
+	    const r1 = BigInt(resolved.attestations[0].reward ?? "0");
+	    const r2 = BigInt(resolved.attestations[1].reward ?? "0");
+	    // raw = 5e18 each, sum = 1e19, budget = 2e18 → scale 0.2×
+	    expect(r1).toBe(1000000000000000000n);
+	    expect(r2).toBe(1000000000000000000n);
+	  });
+	});

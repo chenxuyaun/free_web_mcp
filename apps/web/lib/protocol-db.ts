@@ -7,6 +7,7 @@
 
 import type Database from "better-sqlite3";
 import {
+  applyEmissionCaps,
   arbitrateResolution,
   brierScore,
   canonicalJson,
@@ -500,6 +501,31 @@ export function expireClaim(db: Db, evidenceId: string): ClaimResolutionState {
   return withState(db, evidenceId, (s) => engineExpireClaim(s, now));
 }
 
+/** V26: collect reward recipients from a resolved/arbitrated claim state.
+ *  Returns recipients whose reward > 0 and whose address looks like a valid
+ *  0x-40-hex wallet, so the caller can mint on-chain VERI for them. */
+export interface RewardRecipient {
+  to: string;
+  amount: bigint;
+  kind: "attestor" | "challenger";
+}
+
+export function collectRewardRecipients(state: ClaimResolutionState): RewardRecipient[] {
+  const out: RewardRecipient[] = [];
+  const isAddress = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s);
+  for (const att of state.attestations) {
+    if (att.reward && BigInt(att.reward) > 0n && isAddress(att.agent)) {
+      out.push({ to: att.agent, amount: BigInt(att.reward), kind: "attestor" });
+    }
+  }
+  for (const ch of state.challenges) {
+    if (ch.bondReward && BigInt(ch.bondReward) > 0n && isAddress(ch.challenger)) {
+      out.push({ to: ch.challenger, amount: BigInt(ch.bondReward), kind: "challenger" });
+    }
+  }
+  return out;
+}
+
 /** Update validator reputations using a strictly proper scoring rule
  *  (teacher §9-§10). reputation = running average of the score, so 1.0 =
  *  perfectly calibrated.
@@ -542,16 +568,20 @@ export function settleChallengeBonds(db: Db, state: ClaimResolutionState, config
 
     const won = ch.challengerWon;
     const bond = BigInt(ch.bond);
-    const reward = won
-      ? (bond * BigInt(Math.round(config.challengerRewardFraction * 1_000)) / 1000n).toString()
-      : "0";
+    // V26: challenger reward also passes through emission caps (per-recipient
+    // cap + pool budget) so a single finalize never mints more than the budget.
+    const [reward] = applyEmissionCaps(
+      [won ? (bond * BigInt(Math.round(config.challengerRewardFraction * 1_000)) / 1000n) : 0n],
+      config,
+    );
+    const rewardStr = reward.toString();
     const slashed = !won;
 
     // Persist bond outcome on the challenge row + the returned state so the
     // API response reflects the settlement.
     db.prepare("UPDATE challenges SET bond_slashed = ?, bond_reward = ? WHERE id = ?")
-      .run(slashed ? 1 : 0, reward, ch.id);
-    state.challenges[i] = { ...ch, bondSlashed: slashed, bondReward: reward };
+      .run(slashed ? 1 : 0, rewardStr, ch.id);
+    state.challenges[i] = { ...ch, bondSlashed: slashed, bondReward: rewardStr };
 
     // Update validator stats: win = +1 successful_challenge, lose = 0
     const challengeScore = won ? 1.0 : 0.0;
