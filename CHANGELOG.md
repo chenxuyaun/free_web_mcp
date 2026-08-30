@@ -4,6 +4,25 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.11] - 2026-08-30
+
+### Added — V13 oracle-ladder escalation: knife-edge disputes are INDETERMINATE
+
+- `consensusResolution` checks the oracle tier before deciding the outcome.
+  A dispute in the L3/L4 band (|p−0.5| < 0.1) is too sharp for a coin-flip
+  vote: it resolves as **INDETERMINATE** (result=null) with method
+  `PREDICTION_MARKET` (L3) or `HUMAN_ARBITRATION` (L4), and no one is
+  slashed or rewarded.
+- Challenges on an escalated claim become `ESCALATED` (bond held, not
+  settled) instead of UPHELD/REJECTED.
+- The finalize route skips on-chain anchoring for INDETERMINATE outcomes —
+  writing `null` as FALSE would manufacture certainty on-chain.
+- `determineResolutionTier` gains an epsilon guard against floating-point
+  edge cases (0.5 − 0.4 = 0.0999…98 no longer spuriously escalates).
+- Live-verified: EV-000025 (0.52 vs 0.48, knife-edge) → INDETERMINATE,
+  HUMAN_ARBITRATION, L4, challenge ESCALATED, both attestations unpunished,
+  not anchored.
+
 ## [0.5.10] - 2026-08-30
 
 ### Added — V11 e2e coverage of the full verification protocol
