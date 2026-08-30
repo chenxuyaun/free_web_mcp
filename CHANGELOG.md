@@ -4,6 +4,22 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.6] - 2026-08-30
+
+### Added — V6 challenge bond settlement (economically-risked disputes)
+
+- `settleChallengeBonds` runs at finalize: a winning challenger gets their
+  bond back plus a reward (`challengerRewardFraction × bond`) and a
+  reputation bump; a losing challenger forfeits the bond and takes a
+  reputation hit.
+- `Challenge` gains `bondSlashed` + `bondReward`; persisted to SQLite (ALTER
+  migration) and reflected on the returned API state.
+- Validators now track `successful_challenges` + reputation for challengers,
+  closing the economic loop that previously stopped at the state flag with
+  no financial consequence.
+- 2 web tests: losing challenger (bond slashed, 0 challenges) and winning
+  challenger (5 VERI reward, reputation 1.0) — 81 total across the monorepo.
+
 ## [0.5.5] - 2026-08-30
 
 ### Added — V5 MCP protocol tools: agents as independent evidence producers
