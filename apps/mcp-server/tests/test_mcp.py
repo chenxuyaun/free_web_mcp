@@ -47,6 +47,7 @@ async def test_list_tools() -> None:
         "create_evidence_record",
         "get_evidence",
         "get_claim_state",
+        "get_citation",
         "attest_claim",
         "challenge_claim",
         "finalize_claim",
@@ -173,6 +174,27 @@ async def test_get_claim_state() -> None:
     payload = await call_tool(ctx, "get_claim_state", {"evidence_id": "EV-000001"})
     assert payload["success"] is True
     assert payload["state"]["state"] == "SUPPORTED"
+
+
+@respx.mock
+async def test_get_citation() -> None:
+    respx.get("http://test:3000/api/claims/EV-000001/citation").respond(
+        200,
+        json={
+            "success": True,
+            "citation": {
+                "claimId": "EV-000001",
+                "claimText": "A claim",
+                "evidence": [{"id": "ev:1", "sha256": "abc", "source": "https://a.com"}],
+                "resolution": {"state": "RESOLVED", "result": True, "finalProbability": 0.9},
+            },
+        },
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(ctx, "get_citation", {"evidence_id": "EV-000001"})
+    assert payload["success"] is True
+    assert payload["citation"]["claimId"] == "EV-000001"
+    assert payload["citation"]["evidence"][0]["sha256"] == "abc"
 
 
 @respx.mock

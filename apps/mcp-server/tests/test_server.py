@@ -52,6 +52,7 @@ async def test_well_known_lists_all_four_tools(client: httpx.AsyncClient) -> Non
         "create_evidence_record",
         "get_evidence",
         "get_claim_state",
+        "get_citation",
         "attest_claim",
         "challenge_claim",
         "finalize_claim",

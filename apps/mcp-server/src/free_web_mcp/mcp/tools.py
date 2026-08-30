@@ -464,6 +464,27 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
             return _error_payload(exc)
 
     @server.tool(
+        name="get_citation",
+        title="Get Citation Envelope",
+        description=(
+            "Fetch the verifiable citation envelope for a claim (teacher §19-§22): "
+            "claim text, evidence references with SHA-256 hashes, resolution state "
+            "and the on-chain anchor. This is the compact payload an AI response "
+            "should carry instead of the whole evidence package — any reader can "
+            "expand it back to the original sources."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def get_citation(
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.get_citation(evidence_id)
+        except ToolError as exc:
+            return _error_payload(exc)
+
+    @server.tool(
         name="attest_claim",
         title="Attest a Claim",
         description=(

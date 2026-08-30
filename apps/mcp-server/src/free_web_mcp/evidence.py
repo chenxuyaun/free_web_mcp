@@ -120,6 +120,13 @@ class EvidenceApiClient:
         resolution, effective votes, tier)."""
         return self._get(f"/api/claims/{evidence_id}")
 
+    def get_citation(self, evidence_id: str) -> dict[str, object]:
+        """Fetch the verifiable citation envelope (teacher §19-§22): claim,
+        evidence refs with hashes, resolution state, and on-chain anchor —
+        the compact payload an AI response should carry instead of the whole
+        package."""
+        return self._get(f"/api/claims/{evidence_id}/citation")
+
     def attest_claim(
         self,
         evidence_id: str,
