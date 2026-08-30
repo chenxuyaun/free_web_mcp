@@ -4,7 +4,7 @@
 
 **Free Web MCP — Verifiable Web Evidence Network**：给 AI Agent 免费网页访问，对网页来源的断言做**证据化验证**，并把证据指纹 **SHA-256 锚定到 BNB Smart Chain Testnet**。双栈 pnpm monorepo。
 
-**当前进度（v0.3，M4-M8 已完成）**：dashboard + evidence engine + SQLite 持久化 + 8 个 MCP 工具 + EvidenceRegistry 合约（Anvil 本地链验证锚定 exists()=true）+ Demo Mode + SSRF/限流。
+**当前进度（v0.5.10，V1-V11 已完成）**：六核心对象 + Claim 状态机 + 乐观验证（staking/slashing）+ Brier/Log 双评分声誉 + 独立性加权共识（model/searchProvider/sources/policy 四维相关性）+ oracle ladder 动态升级（L2→L3→L4）+ 挑战 bond 经济结算 + 链上 resolution 验证 + 13 个 MCP 工具（agent 全程参与验证）+ e2e 协议流程测试。全部线上部署验证（yuncai.site）。
 
 ## 技术栈
 
@@ -20,14 +20,14 @@
 
 ```
 apps/
-  web/            Next.js dashboard + API 路由（evidence/demo/anchor/health）
-  mcp-server/     Python MCP server（8 工具，44+ 测试）
+  web/            Next.js dashboard + API 路由（evidence/claims/verify/demo/anchor/health）
+  mcp-server/     Python MCP server（13 工具，56 测试）
 packages/
-  evidence/       claims/engine/hash/package（TS，15 vitest）
+  evidence/       protocol.ts（六核心对象+独立性+评分规则）/ resolution.ts（乐观解析引擎）/ claims/engine/hash/package（TS，56 vitest）
   blockchain/     viem client for EvidenceRegistry（chains/registry）
-contracts/        EvidenceRegistry.sol + forge test（6 测试）
+contracts/        EvidenceRegistry.sol + forge test
 scripts/          seed-demo.ts、demo.ts（pnpm demo）
-docs/             ｜examples/ ｜.github/workflows/ci.yml
+docs/             ｜examples/ ｜e2e/（Playwright）｜.github/workflows/ci.yml
 ```
 
 ## 分层规则（必须遵守）
@@ -57,10 +57,10 @@ cd apps/mcp-server && uv run pytest -q   # Python 测试
 
 ## 开发纪律
 
-- 每个里程碑（M4→M8）完成必须**跑通并展示成果**（dashboard 可见 / 链上可查）再进下一个。
+- 每个里程碑完成必须**跑通并展示成果**（dashboard 可见 / 链上可查）再进下一个。
 - 提交用 Conventional Commits。
 - `.env.local`（web）/`.env`（mcp-server）绝不入库；`apps/web/data/`（SQLite）不入库。
-- CI：`.github/workflows/ci.yml`（Python job + Node job）全绿才合入。
+- CI：`.github/workflows/ci.yml`（Python job + Node job + e2e job）全绿才合入。
 
 ## 状态探测约定
 

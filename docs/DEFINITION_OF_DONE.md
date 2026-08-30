@@ -7,7 +7,7 @@ full independent-verification card.
 | # | Item | Status | Evidence |
 | --- | --- | --- | --- |
 | 1 | Project boots | ✅ | `pnpm dev` → localhost:3000; `/api/health` 10/10 milestones live |
-| 2 | MCP server works | ✅ | 8 tools registered; Python 50 tests; `MCP_SERVER ONLINE` probe |
+| 2 | MCP server works | ✅ | 13 tools registered; Python 56 tests; `MCP_SERVER ONLINE` probe |
 | 3 | AI can call web_search | ✅ | DuckDuckGo/Bing/Baidu aggregation; 5/5 real searches returned results |
 | 4 | AI can call web_fetch | ✅ | Wikipedia extraction 10,880 chars, meta block included |
 | 5 | Web content extraction works | ✅ | trafilatura + BS4 fallback; parser tests |
