@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { canonicalJson, sha256 } from "@free-web-mcp/evidence";
 import { getRegistryClient } from "@/lib/blockchain";
-import { getDb } from "@/lib/db";
+import { getDb, markAnchored } from "@/lib/db";
 import { finalizeClaim, loadClaimState } from "@/lib/protocol-db";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -78,6 +78,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
       );
       txHash = anchor.txHash;
       blockNumber = Number(anchor.blockNumber);
+
+      // Persist the resolution anchor so the on-chain feed (chain/records)
+      // picks it up — same shape as the anchor route writes.
+      markAnchored(params.id, {
+        anchored: true,
+        evidenceHash: `0x${state.evidenceHash}`,
+        contractAddress: anchor.contractAddress,
+        network: anchor.network,
+        blockNumber: Number(anchor.blockNumber),
+        txHash: anchor.txHash,
+        uri: `free-web-mcp://evidence/${params.id}/resolution`,
+      });
     }
 
     return NextResponse.json({

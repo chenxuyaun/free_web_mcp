@@ -166,7 +166,7 @@ describe("V2 independence-weighted consensus (SQLite-backed)", () => {
     attestClaim(db, id, { agent: "0xbbb", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", searchProvider: "bing", sources: ["https://b.com"] }, FAST);
     attestClaim(db, id, { agent: "0xccc", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000", searchProvider: "exa", sources: ["https://c.com"] }, FAST);
 
-    const challenged = challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
     await new Promise((r) => setTimeout(r, 1100));
 
     const state = finalizeClaim(db, id, FAST);
@@ -175,7 +175,7 @@ describe("V2 independence-weighted consensus (SQLite-backed)", () => {
 
     // Reload — searchProvider/sources must round-trip
     const reloaded = loadClaimState(db, id);
-    const [a1, a2, a3] = reloaded!.attestations;
+    const [a1, , a3] = reloaded!.attestations;
     expect(a1.searchProvider).toBe("bing");
     expect(a1.sources).toEqual(["https://a.com"]);
     expect(a3.searchProvider).toBe("exa");
