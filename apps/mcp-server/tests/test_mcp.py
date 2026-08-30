@@ -52,6 +52,7 @@ async def test_list_tools() -> None:
         "challenge_claim",
         "finalize_claim",
         "verify_claim",
+        "arbitrate_claim",
     }
 
 
@@ -297,3 +298,30 @@ async def test_verify_claim_returns_verification() -> None:
     assert payload["success"] is True
     assert payload["verification"]["verified"] is True
     assert payload["verification"]["rootMatch"] is True
+
+
+@respx.mock
+async def test_arbitrate_claim_posts_ruling() -> None:
+    route = respx.post("http://test:3000/api/claims/EV-000001/arbitrate").respond(
+        200,
+        json={
+            "success": True,
+            "state": {
+                "id": "EV-000001",
+                "state": "RESOLVED",
+                "resolution": {"method": "HUMAN_ARBITRATION", "tier": "L4_HUMAN_EXPERT", "result": True},
+                "anchored": True,
+            },
+        },
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(
+        ctx,
+        "arbitrate_claim",
+        {"evidence_id": "EV-000001", "expert": "0xfeed", "result": True, "rationale": "sources hold", "confirm": True},
+    )
+    assert payload["success"] is True
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["result"] is True
+    assert sent["expert"] == "0xfeed"
+    assert sent["confirm"] is True

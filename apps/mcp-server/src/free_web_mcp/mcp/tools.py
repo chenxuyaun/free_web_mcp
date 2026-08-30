@@ -618,3 +618,39 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
             return client.verify_claim(evidence_id=evidence_id)
         except ToolError as exc:
             return _error_payload(exc)
+
+    @server.tool(
+        name="arbitrate_claim",
+        title="Arbitrate a Claim (L4)",
+        description=(
+            "L4 human-expert arbitration of a DISPUTED claim (the oracle ladder's "
+            "final rung). When AI-validator consensus cannot reach a decisive "
+            "outcome, an expert (human or agent) adjudicates: state whether the "
+            "claim is TRUE or FALSE and a rationale. The ruling settles "
+            "attestations (slash/reward) and challenges (UPHELD/REJECTED), and "
+            "with confirm=true is anchored on-chain. Only DISPUTED claims are "
+            "arbitrable."
+        ),
+        annotations=WRITE_API,
+    )
+    async def arbitrate_claim(
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
+        expert: Annotated[str, Field(description="Expert wallet address (0x…) or eip155:… id.")],
+        result: Annotated[bool, Field(description="The expert ruling: true = claim holds, false = claim fails.")],
+        rationale: Annotated[str | None, Field(description="Why the expert ruled this way.")] = None,
+        confirm: Annotated[
+            bool,
+            Field(description="Pass true to anchor the arbitration on-chain (a real transaction)."),
+        ] = False,
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.arbitrate_claim(
+                evidence_id=evidence_id,
+                result=result,
+                expert=expert,
+                rationale=rationale,
+                confirm=confirm,
+            )
+        except ToolError as exc:
+            return _error_payload(exc)

@@ -57,6 +57,7 @@ async def test_well_known_lists_all_four_tools(client: httpx.AsyncClient) -> Non
         "challenge_claim",
         "finalize_claim",
         "verify_claim",
+        "arbitrate_claim",
     }
 
 
@@ -84,7 +85,7 @@ async def test_well_known_annotations_mark_read_only_and_open_world(
     body = r.json()
     # Protocol write tools submit attestations/challenges to the dashboard
     # API — they are not read-only (but still non-destructive, open-world).
-    write_tools = {"attest_claim", "challenge_claim", "finalize_claim"}
+    write_tools = {"attest_claim", "challenge_claim", "finalize_claim", "arbitrate_claim"}
     for tool in body["tools"]:
         ann = tool.get("annotations") or {}
         expected_ro = tool["name"] not in write_tools

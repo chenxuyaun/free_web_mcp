@@ -187,6 +187,25 @@ class EvidenceApiClient:
         root matches — proving the final outcome was honestly anchored."""
         return self._get(f"/api/claims/{evidence_id}/verify")
 
+    def arbitrate_claim(
+        self,
+        evidence_id: str,
+        result: bool,
+        expert: str,
+        rationale: str | None = None,
+        confirm: bool = False,
+    ) -> dict[str, object]:
+        """L4 human-expert arbitration: a human (or agent acting as expert)
+        adjudicates a DISPUTED claim. The ruling settles attestations and
+        challenges; with confirm=True the result is anchored on-chain."""
+        payload: dict[str, object] = {
+            "result": result,
+            "expert": expert,
+            "rationale": rationale,
+            "confirm": confirm,
+        }
+        return self._post(f"/api/claims/{evidence_id}/arbitrate", payload)
+
     def _post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
         try:
             response = httpx.post(f"{self._base}{path}", json=payload, timeout=self._timeout)
