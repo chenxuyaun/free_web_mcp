@@ -265,8 +265,11 @@ export function determineResolutionTier(
   if (method === "CRYPTOGRAPHIC") return "L0_CRYPTOGRAPHIC";
   // No challenge → no escalation needed
   if (claim.challenges.length === 0) return "L2_AI_VALIDATORS";
-  // Dispute severity: how close to the knife-edge 0.5
-  const distance = Math.abs(finalProbability - 0.5);
+  // Dispute severity: how close to the knife-edge 0.5. A small epsilon
+  // absorbs floating-point noise (0.5 − 0.4 can compute as 0.0999…98), so
+  // exact boundaries (e.g. distance = 0.1) don't spuriously escalate.
+  const EPS = 1e-9;
+  const distance = Math.abs(finalProbability - 0.5) + EPS;
   if (distance < 0.05) return "L4_HUMAN_EXPERT";
   if (distance < 0.1) return "L3_ECONOMIC_DISPUTE";
   return "L2_AI_VALIDATORS";

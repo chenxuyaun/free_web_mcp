@@ -223,10 +223,22 @@ function consensusResolution(
     ? Number(weightedSum) / Number(totalWeight) / 1_000_000
     : 0.5;
 
-  // Determine the binary outcome: probability > 0.5 is TRUE
-  const result = finalProbability > 0.5;
+  // V13 (teacher §21/§33 oracle ladder): a knife-edge dispute is NOT a
+  // resolution. When the weighted consensus lands in the disputed band
+  // (|p−0.5| < 0.1 → L3, < 0.05 → L4), a coin-flip at 0.5 would manufacture
+  // certainty — instead the claim escalates: outcome is INDETERMINATE until
+  // the next, more expensive tier (prediction market / human expert) decides.
+  const tier = determineResolutionTier(claim, finalProbability, "CONSENSUS_VOTE");
+  const escalated = tier === "L3_ECONOMIC_DISPUTE" || tier === "L4_HUMAN_EXPERT";
+  const result: boolean | null = escalated ? null : finalProbability > 0.5;
+  const method: ClaimResolution["method"] = escalated
+    ? tier === "L4_HUMAN_EXPERT"
+      ? "HUMAN_ARBITRATION"
+      : "PREDICTION_MARKET"
+    : "CONSENSUS_VOTE";
 
-  // Mark attestations as correct or incorrect
+  // Mark attestations as correct or incorrect (indeterminate → no slash,
+  // no reward — matches attestationMatchesResolution(null) = null).
   const updatedAttestations = claim.attestations.map((att) => {
     const matches = attestationMatchesResolution(att.decision, result);
     return {
@@ -241,6 +253,14 @@ function consensusResolution(
 
   const updatedChallenges = claim.challenges.map((ch) => {
     if (ch.state === "OPEN") {
+      if (escalated) {
+        // Dispute too sharp for this layer — escalate; bond stays held.
+        return {
+          ...ch,
+          state: "ESCALATED" as ChallengeState,
+          resolvedAt: now,
+        };
+      }
       // The challenger's claim is "the attestation is wrong"
       const challengerWon = !result; // If the outcome is false, challenger wins
       return {
@@ -258,9 +278,9 @@ function consensusResolution(
     claimId: claim.id,
     result,
     finalProbability,
-    method: "CONSENSUS_VOTE",
-    tier: determineResolutionTier(claim, finalProbability, "CONSENSUS_VOTE"),
-    basis: updatedAttestations.filter((a) => !a.slashed).map((a) => a.id),
+    method,
+    tier,
+    basis: escalated ? [] : updatedAttestations.filter((a) => !a.slashed).map((a) => a.id),
     resolvedAt: now,
     effectiveVotes: Math.round(effectiveVotes * 1000) / 1000, // Σ independence
   };

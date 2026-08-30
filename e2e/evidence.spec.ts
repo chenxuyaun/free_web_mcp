@@ -132,8 +132,11 @@ test("protocol lifecycle: attest → challenge → finalize → RESOLVED (API + 
   expect(fin.ok()).toBeTruthy();
   const finBody = await fin.json();
   expect(finBody.state.state).toBe("RESOLVED");
-  expect(finBody.state.resolution.method).toBe("CONSENSUS_VOTE");
-  // 0.9 vs 0.1 with equal stakes → 0.5 → knife-edge → L4 escalation
+  // 0.9 vs 0.1 with equal stakes → knife-edge 0.5 → V13 escalation: the
+  // dispute is too sharp for a coin-flip, so it escalates to human
+  // arbitration as INDETERMINATE (no false certainty).
+  expect(finBody.state.resolution.result).toBe(null);
+  expect(finBody.state.resolution.method).toBe("HUMAN_ARBITRATION");
   expect(finBody.state.resolution.tier).toBe("L4_HUMAN_EXPERT");
 
   // 5. UI shows the resolved state with tier + effective votes

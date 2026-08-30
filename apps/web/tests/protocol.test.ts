@@ -265,9 +265,12 @@ describe("V6 challenge bond settlement (SQLite-backed)", () => {
     const id = makeEvidence(dbPath);
     const db = getDb(dbPath);
 
-    // Two diverse agents: SUPPORTED 0.2 vs CONTRADICTED 0.8 → resolves FALSE
+    // Two diverse agents, UNEQUAL stakes for a decisive FALSE (equal stakes
+    // at 0.2/0.8 would hit the knife-edge 0.5 → INDETERMINATE under V13):
+    //   SUPPORTED 0.2 (large stake) vs CONTRADICTED 0.8 (small stake)
+    //   → (0.2×100 + 0.8×50)/150 = 0.4 → FALSE, L2 consensus.
     attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.2, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
-    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.8, stake: "100000000000000000000", model: "claude" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.8, stake: "50000000000000000000", model: "claude" }, FAST);
 
     const challenger = "0x9999999999999999999999999999999999999999";
     challengeClaim(db, id, { challenger, bond: "50000000000000000000", reason: "the truth is FALSE" });

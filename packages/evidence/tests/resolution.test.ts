@@ -179,8 +179,13 @@ describe("resolution engine", () => {
 
   it("slashes attestations that contradicted the resolution", () => {
     const claim = makeClaim();
-    const attestor1 = makeAttestation({ id: "att-1", decision: "SUPPORTED", confidence: 0.8, stake: "100000000000000000000" });
-    const attestor2 = makeAttestation({ id: "att-2", decision: "CONTRADICTED", confidence: 0.2, stake: "100000000000000000000" });
+    // Distinct agents so independence > 0 (same agent → correlation 1.0 →
+    // weight 0, which would fall back to knife-edge 0.5).
+    // Unequal stakes for a decisive FALSE (not knife-edge):
+    //   attestor1 SUPPORTED 0.9 with small stake, attestor2 CONTRADICTED 0.1
+    //   with large stake → weighted probability ≈ 0.37 → FALSE.
+    const attestor1 = makeAttestation({ id: "att-1", agent: "agent-x", decision: "SUPPORTED", confidence: 0.9, stake: "50000000000000000000" });
+    const attestor2 = makeAttestation({ id: "att-2", agent: "agent-y", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000" });
     const attested = submitAttestation(claim, attestor1, SHORT_WINDOW);
     const attested2 = submitAttestation(attested, attestor2, SHORT_WINDOW);
 
@@ -196,7 +201,7 @@ describe("resolution engine", () => {
     const later = new Date(Date.now() + 120_000).toISOString();
     const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
 
-    // Stake-weighted: 0.8 vs 0.2 (equal stakes) → final probability 0.5 → result FALSE (<=0.5)
+    // Weighted: (0.9×50 + 0.1×100) / 150 ≈ 0.37 → FALSE
     expect(resolved.resolution?.result).toBe(false);
     // attestor1 (SUPPORTED) was wrong → slashed
     expect(resolved.attestations[0].slashed).toBe(true);
@@ -448,10 +453,11 @@ describe("V2 independence scoring", () => {
       expect(resolved.resolution?.finalProbability).toBeCloseTo(0.700, 2);
     });
 
-    it("reputation can flip the outcome when the calibrated expert disagrees", () => {
+    it("reputation weighting pushes a near-knife consensus to INDETERMINATE escalation", () => {
       // ag1 SUPPORTED 0.6 rep 0, ag2 SUPPORTED 0.55 rep 0, ag3 CONTRADICTED 0.4 rep 0.99
-      // Plain: (0.6+0.55+0.4)/3 ≈ 0.517 → TRUE
-      // With rep: (0.6 + 0.55 + 0.4×1.99)/(1+1+1.99) = (1.15+0.796)/3.99 ≈ 0.488 → FALSE
+      // With rep: (0.6 + 0.55 + 0.4×1.99)/(1+1+1.99) ≈ 0.488 → knife-edge.
+      // V13: a knife-edge dispute is NOT a coin-flip — it escalates to
+      // HUMAN_ARBITRATION and resolves INDETERMINATE (no slash).
       const claim = makeClaim();
       const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.6, stake: "100000000000000000000", reputation: 0 });
       const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "SUPPORTED", confidence: 0.55, stake: "100000000000000000000", reputation: 0 });
@@ -473,8 +479,15 @@ describe("V2 independence scoring", () => {
       const later = new Date(Date.now() + 120_000).toISOString();
       const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
 
-      expect(resolved.resolution?.result).toBe(false);
+      expect(resolved.resolution?.result).toBe(null);
+      expect(resolved.resolution?.method).toBe("HUMAN_ARBITRATION");
+      expect(resolved.resolution?.tier).toBe("L4_HUMAN_EXPERT");
       expect(resolved.resolution?.finalProbability).toBeCloseTo(0.488, 2);
+      // No one is slashed or rewarded on an indeterminate outcome
+      for (const att of resolved.attestations) {
+        expect(att.slashed).toBe(false);
+        expect(att.reward).toBe("0");
+      }
     });
 
     it("reputation is clamped to [0,1] (no weight amplification exploit)", () => {

@@ -49,7 +49,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     let blockNumber: number | null = null;
     let resolutionRoot: string | null = null;
 
-    if (body.confirm === true) {
+    // V13: an INDETERMINATE (escalated) resolution has no boolean outcome —
+    // anchoring `result === null` as FALSE on-chain would manufacture
+    // certainty. Skip the write and surface the escalation instead.
+    const indeterminate = res.result === null;
+
+    if (body.confirm === true && !indeterminate) {
       // Compute the resolution root: sha256 over attestations + challenges +
       // outcome (teacher §21: merkle-style root so settlement is recomputable).
       // Shared with the verify route so the local root always matches what
@@ -89,6 +94,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         txHash,
         blockNumber,
         resolutionRoot,
+        escalated: indeterminate,
+        escalation: indeterminate ? res.method : null,
       },
     });
   } catch (e) {
