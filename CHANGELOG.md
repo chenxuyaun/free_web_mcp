@@ -4,6 +4,22 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.4] - 2026-08-30
+
+### Added — V4 oracle-ladder tier escalation (teacher §21/§33)
+
+- `determineResolutionTier(claim, finalProbability, method)` — the oracle
+  ladder is now actually computed instead of hardcoded `L2_AI_VALIDATORS`:
+  - no challenge / optimistic finalize → L2
+  - challenge + clear consensus (|p−0.5| ≥ 0.1) → L2
+  - challenge + high disagreement (|p−0.5| < 0.1) → L3_ECONOMIC_DISPUTE
+  - challenge + extreme disagreement (|p−0.5| < 0.05) → L4_HUMAN_EXPERT
+  - CRYPTOGRAPHIC method → L0
+- Both resolution paths (optimistic + consensus) record the dynamic tier;
+  the tier round-trips through SQLite and is shown on the dashboard.
+- New tests: 7 evidence ladder cases + 1 web tier round-trip (56→63
+  evidence… 56 evidence, 14→15 web; 80 total).
+
 ## [0.5.3] - 2026-08-30
 
 ### Added — V3 reputation-weighted consensus (teacher §9-§10 + §12-§13 closed loop)

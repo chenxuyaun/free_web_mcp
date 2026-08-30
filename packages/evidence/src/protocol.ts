@@ -241,6 +241,31 @@ export function effectiveVotes(attestations: Attestation[]): number {
   return computeIndependence(attestations).reduce((sum, v) => sum + v, 0);
 }
 
+/** Determine the oracle-ladder tier for a resolution (teacher §21 / §33).
+ *  Higher tier = higher cost, higher finality.
+ *
+ *  Rules:
+ *  - No challenge / optimistic finalize → L2 (AI validator consensus)
+ *  - Challenge exists, consensus clear (|p−0.5| ≥ 0.1) → L2
+ *  - Challenge exists, high disagreement (|p−0.5| < 0.1) → L3 economic dispute
+ *  - Challenge exists, extreme disagreement (|p−0.5| < 0.05) → L4 human expert
+ *  - L0/L1/L5 are reserved for cryptographic, observable, and institutional
+ *    methods and are set manually. */
+export function determineResolutionTier(
+  claim: { challenges: Array<{ state: ChallengeState }> },
+  finalProbability: number,
+  method: ResolutionMethod,
+): VerificationTier {
+  if (method === "CRYPTOGRAPHIC") return "L0_CRYPTOGRAPHIC";
+  // No challenge → no escalation needed
+  if (claim.challenges.length === 0) return "L2_AI_VALIDATORS";
+  // Dispute severity: how close to the knife-edge 0.5
+  const distance = Math.abs(finalProbability - 0.5);
+  if (distance < 0.05) return "L4_HUMAN_EXPERT";
+  if (distance < 0.1) return "L3_ECONOMIC_DISPUTE";
+  return "L2_AI_VALIDATORS";
+}
+
 // ---------------------------------------------------------------------------
 // Protocol helpers
 // ---------------------------------------------------------------------------

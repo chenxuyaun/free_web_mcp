@@ -6,6 +6,7 @@ import {
   brierScore,
   canTransition,
   computeIndependence,
+  determineResolutionTier,
   effectiveVotes,
   logScore,
   nextClaimState,
@@ -497,6 +498,69 @@ describe("V2 independence scoring", () => {
       // clamped: a1 factor 2.0, a2 factor 1.0 → (0.9×2 + 0.1×1)/3 = 0.633 → TRUE
       expect(resolved.resolution?.result).toBe(true);
       expect(resolved.resolution?.finalProbability).toBeCloseTo(0.633, 3);
+    });
+  });
+
+  describe("V4 oracle-ladder tier escalation (teacher §21/§33)", () => {
+    const SHORT_WINDOW: OptimisticConfig = {
+      ...DEFAULT_OPTIMISTIC_CONFIG,
+      challengeWindowSec: 60,
+    };
+    const challengedClaim = { challenges: [{ state: "OPEN" as const }] };
+    const cleanClaim = { challenges: [] };
+
+    it("no challenge → L2_AI_VALIDATORS regardless of probability", () => {
+      expect(determineResolutionTier(cleanClaim, 0.9, "CONSENSUS_VOTE")).toBe("L2_AI_VALIDATORS");
+      expect(determineResolutionTier(cleanClaim, 0.51, "CONSENSUS_VOTE")).toBe("L2_AI_VALIDATORS");
+    });
+
+    it("cryptographic method → L0 regardless of challenges", () => {
+      expect(determineResolutionTier(challengedClaim, 0.5, "CRYPTOGRAPHIC")).toBe("L0_CRYPTOGRAPHIC");
+    });
+
+    it("challenge + clear consensus (|p−0.5| ≥ 0.1) → L2", () => {
+      expect(determineResolutionTier(challengedClaim, 0.62, "CONSENSUS_VOTE")).toBe("L2_AI_VALIDATORS");
+      expect(determineResolutionTier(challengedClaim, 0.35, "CONSENSUS_VOTE")).toBe("L2_AI_VALIDATORS");
+    });
+
+    it("challenge + high disagreement (|p−0.5| < 0.1) → L3_ECONOMIC_DISPUTE", () => {
+      expect(determineResolutionTier(challengedClaim, 0.57, "CONSENSUS_VOTE")).toBe("L3_ECONOMIC_DISPUTE");
+      expect(determineResolutionTier(challengedClaim, 0.43, "CONSENSUS_VOTE")).toBe("L3_ECONOMIC_DISPUTE");
+    });
+
+    it("challenge + extreme disagreement (|p−0.5| < 0.05) → L4_HUMAN_EXPERT", () => {
+      expect(determineResolutionTier(challengedClaim, 0.52, "CONSENSUS_VOTE")).toBe("L4_HUMAN_EXPERT");
+      expect(determineResolutionTier(challengedClaim, 0.47, "CONSENSUS_VOTE")).toBe("L4_HUMAN_EXPERT");
+    });
+
+    it("consensus resolution records the escalated tier on the claim", () => {
+      const claim = makeClaim();
+      const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000" });
+      const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000" });
+
+      const attested = submitAttestation(claim, a1, SHORT_WINDOW);
+      const attested2 = submitAttestation(attested, a2, SHORT_WINDOW);
+      const challenged = submitChallenge(attested2, {
+        id: "chl-1",
+        claimId: "claim-1",
+        challenger: "0xchallenger",
+        bond: "100000000000000000000",
+        state: "OPEN",
+        createdAt: "2026-08-29T02:00:00.000Z",
+      });
+      const later = new Date(Date.now() + 120_000).toISOString();
+      const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
+
+      // Knife-edge consensus → escalated to L4 (human expert needed)
+      expect(resolved.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+    });
+
+    it("optimistic finalize without challenge stays L2", () => {
+      const claim = makeClaim();
+      const attested = submitAttestation(claim, makeAttestation({ confidence: 0.9 }), SHORT_WINDOW);
+      const later = new Date(Date.now() + 120_000).toISOString();
+      const resolved = finalizeResolution(attested, SHORT_WINDOW, later);
+      expect(resolved.resolution?.tier).toBe("L2_AI_VALIDATORS");
     });
   });
 });

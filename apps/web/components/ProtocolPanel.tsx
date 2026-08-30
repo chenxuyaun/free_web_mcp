@@ -35,6 +35,7 @@ interface ClaimStateView {
     method: string;
     resolvedAt: string;
     effectiveVotes?: number;
+    tier?: string;
   } | null;
   challengeDeadline: number | null;
 }
@@ -199,6 +200,11 @@ export function ProtocolPanel({ id }: { id: string }) {
                 <span className="font-normal text-violet-400">
                   ({Math.round(state.resolution.finalProbability * 100)}%, {state.resolution.method})
                 </span>
+                {state.resolution.tier && (
+                  <span className="ml-2 rounded bg-violet-900/60 px-1.5 py-0.5 text-[10px] font-semibold text-violet-200">
+                    {state.resolution.tier.replace("_", " ")}
+                  </span>
+                )}
               </div>
               {state.resolution.effectiveVotes !== undefined && (
                 <div className="text-violet-400">

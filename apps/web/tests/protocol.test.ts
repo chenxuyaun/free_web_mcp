@@ -202,4 +202,24 @@ describe("V2 independence-weighted consensus (SQLite-backed)", () => {
     const reloaded = loadClaimState(db, id);
     expect(reloaded!.attestations[0].reputation).toBeCloseTo(0.97, 5);
   });
+
+  it("persists the escalated oracle-ladder tier on the resolution", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // Knife-edge consensus (0.52 vs 0.48, equal stakes) → L4_HUMAN_EXPERT
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000" }, FAST);
+
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    expect(state.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+
+    // Round-trip through SQLite
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded?.resolution?.tier).toBe("L4_HUMAN_EXPERT");
+  });
 });

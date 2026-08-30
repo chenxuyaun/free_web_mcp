@@ -20,6 +20,7 @@ export {
   attestationMatchesResolution,
   attestationCorrelation,
   computeIndependence,
+  determineResolutionTier,
   effectiveVotes,
   CLAIM_STATE_ORDER,
   CLAIM_STATE_TRANSITIONS,

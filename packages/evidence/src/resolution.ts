@@ -19,6 +19,7 @@ import {
   type ClaimState,
   attestationMatchesResolution,
   computeIndependence,
+  determineResolutionTier,
 } from "./protocol";
 
 // ---------------------------------------------------------------------------
@@ -173,7 +174,7 @@ function optimisticFinalize(
     result,
     finalProbability: firstAttestation.confidence,
     method: "OPTIMISTIC_FINALIZE",
-    tier: "L2_AI_VALIDATORS",
+    tier: determineResolutionTier(claim, firstAttestation.confidence, "OPTIMISTIC_FINALIZE"),
     basis: [firstAttestation.id],
     resolvedAt: now,
     effectiveVotes: 1, // single independent attestation
@@ -258,7 +259,7 @@ function consensusResolution(
     result,
     finalProbability,
     method: "CONSENSUS_VOTE",
-    tier: "L2_AI_VALIDATORS",
+    tier: determineResolutionTier(claim, finalProbability, "CONSENSUS_VOTE"),
     basis: updatedAttestations.filter((a) => !a.slashed).map((a) => a.id),
     resolvedAt: now,
     effectiveVotes: Math.round(effectiveVotes * 1000) / 1000, // Σ independence
