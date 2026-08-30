@@ -4,6 +4,32 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-08-30
+
+### Added — Verifiable Knowledge Protocol V1 (teacher's framework)
+
+- **Six core objects**: Claim / Evidence / Attestation / Challenge /
+  Resolution / Citation with a formal claim state machine
+  (DRAFT → OBSERVED → SUPPORTED → CHALLENGED → DISPUTED → RESOLVED → FINAL).
+- **Optimistic resolution engine**: attestations carry confidence + VERI
+  stake; a challenge window opens on first attestation; unchallenged claims
+  finalize optimistically, challenged claims resolve via stake-weighted
+  consensus — wrong attestors are slashed, correct ones rewarded.
+- **On-chain resolution anchor**: EvidenceRegistry gained resolveClaim /
+  getResolution / isResolved (one tx per finalized claim, resolutionRoot =
+  sha256 over attestations + challenge + outcome). Redeployed to BSC
+  Testnet at 0x19AB142cA0Aad02BB55ffB6129494926c520c60F.
+- **Citation Envelope API**: GET /api/claims/[id]/citation — the verifiable
+  reference (claim + quote + evidence refs + resolution state + anchor) that
+  AI responses can carry instead of full packages (teacher §19-§22).
+- **ProtocolPanel** on evidence detail: lifecycle badge, attestation list
+  with slash/reward marks, and the V1 actions (attest / challenge /
+  finalize+anchor).
+- **Brier-score reputation**: on finalize, each attestor's confidence is
+  scored against the outcome via a strictly proper scoring rule; the
+  validator's reputation becomes the running average of (1 - brier).
+- 52 Node tests + 21 forge tests green.
+
 ## [0.4.2] - 2026-08-29
 
 ### Changed — MCP server on Python SDK 2.x

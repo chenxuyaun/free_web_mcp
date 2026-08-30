@@ -7,6 +7,7 @@
 
 import type Database from "better-sqlite3";
 import {
+  brierScore,
   finalizeResolution,
   submitAttestation,
   submitChallenge,
@@ -339,7 +340,36 @@ export function finalizeClaim(
   config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG,
 ): ClaimResolutionState {
   const now = new Date().toISOString();
-  return withState(db, evidenceId, (s) => finalizeResolution(s, config, now));
+  const state = withState(db, evidenceId, (s) => finalizeResolution(s, config, now));
+  // V2 scoring: after a resolution, update each attestor's reputation via a
+  // strictly proper scoring rule (Brier), rewarding calibration not just
+  // correctness (teacher §9).
+  settleBrierReputations(db, state);
+  return state;
+}
+
+/** Update validator reputations using the Brier score of their confidence
+ *  against the final resolution outcome (teacher §9-§10).
+ *  reputation = running average of (1 - brier) so 1.0 = perfectly calibrated. */
+export function settleBrierReputations(db: Db, state: ClaimResolutionState): void {
+  const result = state.resolution?.result;
+  if (result === null || result === undefined) return; // indeterminate — no scoring
+
+  for (const att of state.attestations) {
+    if (att.decision === "UNCERTAIN") continue; // no probability commitment
+    const brier = brierScore(att.confidence, result);
+    const score = 1 - brier; // 1.0 perfect, 0.0 worst
+
+    // Upsert into validators (reuse the existing table so the leaderboard
+    // picks it up automatically).
+    db.prepare(
+      `INSERT INTO validators (address, reputation, verified_claims, successful_challenges, total_votes, created_at)
+       VALUES (?, ?, 0, 0, 1, ?)
+       ON CONFLICT(address) DO UPDATE SET
+         reputation = (reputation * total_votes + ?) / (total_votes + 1),
+         total_votes = total_votes + 1`,
+    ).run(att.agent.toLowerCase(), score, new Date().toISOString(), score);
+  }
 }
 
 export function listClaims(db: Db, limit = 50): Array<{
