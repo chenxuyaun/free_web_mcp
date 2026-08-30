@@ -38,6 +38,27 @@ full independent-verification card.
 | Multi-provider search aggregation | DuckDuckGo + Bing + Baidu fallback, URL dedupe |
 | Playwright e2e + CI (Python/Node/e2e jobs) | [Actions](https://github.com/chenxuyaun/free_web_mcp/actions) — all green |
 
+## Verifiable Knowledge Protocol (teacher framework, V1-V11)
+
+The full protocol layer built on the spec MVP — six core objects, optimistic
+verification, staking/slashing, proper scoring, independence weighting,
+oracle ladder, and agent participation. All live-verified on yuncai.site.
+
+| Milestone | What | Live evidence |
+| --- | --- | --- |
+| V1 | Six core objects + claim state machine + optimistic verification + Brier reputation + citation envelope | EV-000014: create→OBSERVED→attest→SUPPORTED→challenge→CHALLENGED→finalize→RESOLVED, on-chain tx + Brier settle 0.99 |
+| V2 | Independence scoring + effective_votes (teacher §12-§13) | EV-000015: two same-model votes (0.3 indep each) outweighed by one diverse (1.0) → outcome flipped; effectiveVotes 1.6 |
+| V2.5 | Four-dimension correlation: model / searchProvider / sources / policy | EV-000016: bing-pair + exa singleton → effectiveVotes 2, bing-pair slashed |
+| V3 | Reputation-weighted consensus: stake × independence × (1+rep) | EV-000018: high-rep expert (1.295) flipped 0.533→0.5 against two newcomers |
+| V4 | Oracle ladder tier escalation: clear→L2, sharp→L3, knife-edge→L4 | EV-000019: 0.52 vs 0.48 → L4_HUMAN_EXPERT, anchored |
+| V5 | MCP protocol tools: get_claim_state / attest_claim / challenge_claim (11 tools) | EV-000020: created + attested entirely via MCP, model/provider/sources round-trip |
+| V6 | Challenge bond settlement: winner bond+reward, loser forfeits | EV-000021: challenger won → bond back + 5 VERI reward + rep 1.0 |
+| V7 | On-chain resolution verification (recomputable root) | EV-000021 verify: verified=true, root matched |
+| V8 | MCP finalize_claim: agents run the whole lifecycle (12 tools) | EV-000022: create→attest→challenge→finalize→anchor via MCP only |
+| V9 | MCP verify_claim (13 tools) | EV-000022 verify via MCP: verified=true |
+| V10 | Configurable proper scoring rules: brier / log (teacher §9-§10) | EV-000024: log rule settled rep exactly 0.9 for 0.9-confident correct |
+| V11 | Playwright e2e protocol lifecycle flow | 5 e2e tests pass (chromium) + CI e2e job |
+
 ## Not done (honest)
 
 | Item | Why |
