@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { CitationEnvelope, EvidenceRef } from "@free-web-mcp/evidence";
+import { sha256, type CitationEnvelope, type EvidenceRef } from "@free-web-mcp/evidence";
 import { getDb, getEvidencePackage } from "@/lib/db";
 import { loadClaimState } from "@/lib/protocol-db";
 
@@ -31,10 +31,12 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     publishedAt: s.publishedAt,
     retrievedAt: s.retrievedAt,
     cid: pkg.storage?.uri,
-    // The claim text's first sentence serves as the short quote — the full
-    // snapshot (and span locators) come from the content-addressed package.
+    // The quote is a verbatim span from the source page (teacher §19-§22)
+    // when captured; fall back to the claim text's first sentence so the
+    // envelope always carries something expandable.
     locator: { type: "quote" },
-    quote: pkg.claim.text.slice(0, 160),
+    quote: s.quote || pkg.claim.text.slice(0, 160),
+    ...(s.quote ? { quoteHash: sha256(s.quote) } : {}),
   }));
 
   const envelope: CitationEnvelope = {

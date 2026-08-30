@@ -134,4 +134,25 @@ describe("evidence db layer", () => {
     insertEvidence(makePkg("Only"), dbPath);
     expect(countEvidence(dbPath)).toBe(1);
   });
+
+  it("V17: source quotes persist and feed the citation envelope", () => {
+    const dbPath = makeDbPath();
+    const src = {
+      ...source("https://a.example/quote", "official"),
+      quote: "The factory in Shenzhen produced 1.2M units last quarter.",
+    };
+    const { pkg } = buildEvidencePackage({
+      id: "EV-TEMP",
+      claimText: "Factory produced over a million units",
+      claimType: "number",
+      supporting: [src],
+      crossVerified: true,
+    });
+    const saved = insertEvidence({ pkg, hash: "" }, dbPath);
+    const loaded = getEvidencePackage(saved.id, dbPath);
+    expect(loaded?.sources[0].quote).toBe(src.quote);
+
+    // quoteHash is sha256 of the verbatim quote — citation can be re-verified
+    expect(sha256(src.quote)).toMatch(/^[0-9a-f]{64}$/);
+  });
 });

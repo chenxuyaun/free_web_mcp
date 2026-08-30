@@ -26,6 +26,7 @@ function normalizeSource(s: Partial<EvidenceSource>, index: number): EvidenceSou
     publishedAt: s.publishedAt,
     retrievedAt: s.retrievedAt ?? new Date().toISOString(),
     contentHash: s.contentHash ?? "",
+    quote: s.quote,
   };
 }
 

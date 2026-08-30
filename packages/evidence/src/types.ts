@@ -31,6 +31,9 @@ export interface EvidenceSource {
   publishedAt?: string; // ISO-8601
   retrievedAt: string; // ISO-8601
   contentHash: string; // SHA-256 of the raw content this source represents
+  /** A short verbatim quote from the source page that supports the claim
+   *  (teacher §19-§22: the citation carries a quote, not just a hash). */
+  quote?: string;
 }
 
 export type VerificationStatus =

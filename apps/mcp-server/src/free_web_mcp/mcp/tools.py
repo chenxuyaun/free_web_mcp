@@ -395,8 +395,10 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
                 default_factory=list,
                 description=(
                     "Sources that support the claim. Each: {url, title, source_type, "
-                    "published_at?, retrieved_at?, content_hash?}. source_type is one of "
-                    "official/primary/major_media/professional/secondary/unknown/social."
+                    "published_at?, retrieved_at?, content_hash?, quote?}. source_type is one of "
+                    "official/primary/major_media/professional/secondary/unknown/social. "
+                    "quote is an optional short verbatim span from the page that supports "
+                    "the claim — it becomes the citation quote (teacher §19-§22)."
                 ),
             ),
         ],
