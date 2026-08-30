@@ -50,6 +50,7 @@ async def test_list_tools() -> None:
         "attest_claim",
         "challenge_claim",
         "finalize_claim",
+        "verify_claim",
     }
 
 
@@ -247,3 +248,25 @@ async def test_finalize_claim_posts_confirm() -> None:
     assert payload["success"] is True
     sent = json.loads(route.calls.last.request.content)
     assert sent["confirm"] is True
+
+
+@respx.mock
+async def test_verify_claim_returns_verification() -> None:
+    respx.get("http://test:3000/api/claims/EV-000001/verify").respond(
+        200,
+        json={
+            "success": True,
+            "verification": {
+                "claimId": "EV-000001",
+                "verified": True,
+                "rootMatch": True,
+                "onChainRoot": "0xabc",
+                "localRoot": "0xabc",
+            },
+        },
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(ctx, "verify_claim", {"evidence_id": "EV-000001"})
+    assert payload["success"] is True
+    assert payload["verification"]["verified"] is True
+    assert payload["verification"]["rootMatch"] is True

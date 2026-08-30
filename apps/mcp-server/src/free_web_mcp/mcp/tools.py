@@ -560,3 +560,25 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
             return client.finalize_claim(evidence_id=evidence_id, confirm=confirm)
         except ToolError as exc:
             return _error_payload(exc)
+
+    @server.tool(
+        name="verify_claim",
+        title="Verify a Claim On-chain",
+        description=(
+            "Recompute the resolution root of a resolved claim and verify it "
+            "against the on-chain record. Returns verified=true only when the "
+            "claim is resolved on-chain AND the SHA-256 root of the local "
+            "attestations/challenges/outcome matches what EvidenceRegistry "
+            "stored — proving the final outcome was honestly anchored and not "
+            "tampered with. Use after finalize_claim or on any RESOLVED claim."
+        ),
+        annotations=READ_OPEN,
+    )
+    async def verify_claim(
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.verify_claim(evidence_id=evidence_id)
+        except ToolError as exc:
+            return _error_payload(exc)

@@ -55,6 +55,7 @@ async def test_well_known_lists_all_four_tools(client: httpx.AsyncClient) -> Non
         "attest_claim",
         "challenge_claim",
         "finalize_claim",
+        "verify_claim",
     }
 
 

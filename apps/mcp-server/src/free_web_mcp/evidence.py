@@ -172,6 +172,12 @@ class EvidenceApiClient:
             {"confirm": confirm},
         )
 
+    def verify_claim(self, evidence_id: str) -> dict[str, object]:
+        """Recompute the resolution root and verify it against the on-chain
+        record. Returns verified=true only when isResolved and the SHA-256
+        root matches — proving the final outcome was honestly anchored."""
+        return self._get(f"/api/claims/{evidence_id}/verify")
+
     def _post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
         try:
             response = httpx.post(f"{self._base}{path}", json=payload, timeout=self._timeout)
