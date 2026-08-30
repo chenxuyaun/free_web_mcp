@@ -4,6 +4,32 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.13] - 2026-08-30
+
+### Added — V15 citation envelope UI (teacher §19-§22)
+
+- New `CitationEnvelope` component on the evidence detail page: fetches the
+  verifiable reference envelope and offers one-click copy, so an AI response
+  can carry the compact Citation (claim + quote + locator + hash +
+  resolution + anchor) instead of the full package.
+- Live on yuncai.site: `https://yuncai.site/webmcp/evidence/EV-XXXXXX`.
+
+## [0.5.12] - 2026-08-30
+
+### Added — V14 oracle ladder: knife-edge stays DISPUTED (no dead-end)
+
+- A knife-edge consensus no longer resolves INDETERMINATE-terminally — the
+  claim stays DISPUTED, attestations remain unsettled, challenges become
+  ESCALATED (bond held), and more independent validators can attest.
+- `finalizeResolution` re-runs consensus on DISPUTED claims: decisive → 
+  RESOLVED, still knife-edge → stays DISPUTED.
+- Escalated challenges settle (UPHELD/REJECTED) on a decisive re-finalize.
+- Finalize route returns DISPUTED as success (not an error); nothing is
+  anchored until a decisive outcome exists.
+- Live-verified: EV-000026 — 0.52 vs 0.48 → DISPUTED; a third validator
+  (CONTRADICTED 0.05) broke the knife-edge → RESOLVED (FALSE, L2),
+  challenge UPHELD, wrong attestor slashed.
+
 ## [0.5.11] - 2026-08-30
 
 ### Added — V13 oracle-ladder escalation: knife-edge disputes are INDETERMINATE
