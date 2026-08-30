@@ -22,7 +22,8 @@ export type ClaimState =
   | "CHALLENGED" // a challenge is pending resolution
   | "DISPUTED" // escalated beyond the optimistic layer
   | "RESOLVED" // resolution produced (final truth outcome known)
-  | "FINAL"; // settlement applied (rewards/slashes executed)
+| "FINAL" // settlement applied (rewards/slashes executed)
+	  | "EXPIRED"; // challenge window passed without resolution (V25)
 
 export const CLAIM_STATE_ORDER: ClaimState[] = [
   "DRAFT",
@@ -32,17 +33,19 @@ export const CLAIM_STATE_ORDER: ClaimState[] = [
   "DISPUTED",
   "RESOLVED",
   "FINAL",
+  "EXPIRED",
 ];
 
 /** Legal transitions for the claim state machine. */
 export const CLAIM_STATE_TRANSITIONS: Record<ClaimState, ClaimState[]> = {
   DRAFT: ["OBSERVED"],
   OBSERVED: ["SUPPORTED"],
-  SUPPORTED: ["CHALLENGED", "RESOLVED"], // challenge raises; or optimistic finalize
-  CHALLENGED: ["DISPUTED", "RESOLVED"], // escalated, or dispute settled at this layer
+  SUPPORTED: ["CHALLENGED", "RESOLVED", "EXPIRED"], // challenge raises; or optimistic finalize; or window expires
+  CHALLENGED: ["DISPUTED", "RESOLVED", "EXPIRED"], // escalated, or dispute settled, or window expires
   DISPUTED: ["RESOLVED"],
   RESOLVED: ["FINAL"],
   FINAL: [],
+  EXPIRED: [],
 };
 
 // ---------------------------------------------------------------------------

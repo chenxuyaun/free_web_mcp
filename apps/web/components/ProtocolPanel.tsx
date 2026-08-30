@@ -48,6 +48,7 @@ const STATE_STYLE: Record<string, string> = {
   DISPUTED: "bg-orange-950 text-orange-300 border border-orange-800",
   RESOLVED: "bg-violet-950 text-violet-300 border border-violet-800",
   FINAL: "bg-green-900 text-green-200 border border-green-700",
+  EXPIRED: "bg-neutral-950 text-neutral-400 border border-neutral-700",
 };
 
 const STATE_ICON: Record<string, React.ReactNode> = {

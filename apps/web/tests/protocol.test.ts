@@ -9,6 +9,7 @@ import {
   attestClaim,
   challengeClaim,
   computeResolutionRoot,
+  expireClaim,
   finalizeClaim,
   loadClaimState,
   type ScoringRule,
@@ -440,6 +441,49 @@ describe("V24 resolution policy/version metadata (SQLite-backed)", () => {
     const resolved = arbitrateClaim(db, id, { result: true, expert: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" });
     expect(resolved.resolution?.resolutionPolicy).toBe("human-arbitration");
     expect(resolved.resolution?.resolutionVersion).toBe("1.0");
+  });
+});
+
+describe("V25 claim expiry (SQLite-backed)", () => {
+  it("expires a SUPPORTED claim whose challenge window lapsed", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    // 1s window closes
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const expired = expireClaim(db, id);
+    expect(expired.state).toBe("EXPIRED");
+    expect(expired.resolution).toBeNull();
+
+    // Terminal — cannot attest or finalize afterwards
+    expect(() => attestClaim(db, id, { agent: "0xbbb", decision: "SUPPORTED", confidence: 0.8, stake: "100" }, FAST)).toThrow();
+    expect(() => finalizeClaim(db, id, FAST)).toThrow();
+
+    // Round-trip
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded?.state).toBe("EXPIRED");
+  });
+
+  it("cannot expire before the window closes", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    // window = 1s, not yet closed
+    expect(() => expireClaim(db, id)).toThrow();
+  });
+
+  it("cannot expire a resolved claim", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    await new Promise((r) => setTimeout(r, 1100));
+    finalizeClaim(db, id, FAST); // RESOLVED
+    expect(() => expireClaim(db, id)).toThrow();
   });
 });
 

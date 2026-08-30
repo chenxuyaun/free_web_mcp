@@ -39,6 +39,7 @@ export {
 } from "./protocol";
 export {
   arbitrateResolution,
+  expireClaim,
   submitAttestation,
   submitChallenge,
   finalizeResolution,

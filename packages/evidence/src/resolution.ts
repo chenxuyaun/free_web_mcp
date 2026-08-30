@@ -340,7 +340,35 @@ function consensusResolution(
 
 /** Check if a claim is in a terminal state. */
 export function isTerminal(state: ClaimState): boolean {
-  return state === "RESOLVED" || state === "FINAL";
+  return state === "RESOLVED" || state === "FINAL" || state === "EXPIRED";
+}
+
+/** Expire a claim whose challenge window closed without a resolution
+ *  (V25). SUPPORTED and CHALLENGED claims that are past their deadline and
+ *  have no resolution become EXPIRED — a terminal state where no stake is
+ *  settled and nothing is anchored: the dispute simply lapsed. */
+export function expireClaim(
+  claim: ClaimResolutionState,
+  now: string = new Date().toISOString(),
+): ClaimResolutionState {
+  if (claim.state !== "SUPPORTED" && claim.state !== "CHALLENGED") {
+    throw new Error(`Cannot expire claim in state ${claim.state} — only SUPPORTED/CHALLENGED`);
+  }
+  if (claim.resolution) {
+    throw new Error("Cannot expire a claim that is already resolved");
+  }
+  if (claim.challengeDeadline === null) {
+    throw new Error("Claim has no challenge deadline — cannot expire");
+  }
+  const nowSec = Math.floor(new Date(now).getTime() / 1000);
+  if (nowSec < claim.challengeDeadline) {
+    throw new Error("Challenge window has not closed yet");
+  }
+  return {
+    ...claim,
+    state: "EXPIRED",
+    updatedAt: now,
+  };
 }
 
 /** Human-expert arbitration of a DISPUTED claim (L4, teacher §21/§33).

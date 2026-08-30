@@ -10,6 +10,7 @@ import {
   arbitrateResolution,
   brierScore,
   canonicalJson,
+  expireClaim as engineExpireClaim,
   finalizeResolution,
   logScore,
   sha256,
@@ -490,6 +491,13 @@ export function finalizeClaim(
   // economically-risked judgment: challenges must hurt when wrong).
   settleChallengeBonds(db, state, config);
   return state;
+}
+
+/** V25: expire a claim whose challenge window closed without resolution.
+ *  Terminal — no stake settlement, nothing anchored; the dispute lapsed. */
+export function expireClaim(db: Db, evidenceId: string): ClaimResolutionState {
+  const now = new Date().toISOString();
+  return withState(db, evidenceId, (s) => engineExpireClaim(s, now));
 }
 
 /** Update validator reputations using a strictly proper scoring rule
