@@ -370,6 +370,79 @@ describe("V19 human-expert arbitration (SQLite-backed)", () => {
   });
 });
 
+describe("V24 resolution policy/version metadata (SQLite-backed)", () => {
+  it("optimistic finalize records optimistic-v1", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    expect(state.resolution?.method).toBe("OPTIMISTIC_FINALIZE");
+    expect(state.resolution?.resolutionPolicy).toBe("optimistic-v1");
+    expect(state.resolution?.resolutionVersion).toBe("1.0");
+
+    // Round-trip through SQLite
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded?.resolution?.resolutionPolicy).toBe("optimistic-v1");
+    expect(reloaded?.resolution?.resolutionVersion).toBe("1.0");
+  });
+
+  it("challenged consensus records consensus-vote; ladder resolution records logit-market", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // Decisive consensus directly from CHALLENGED → consensus-vote
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.3, stake: "100000000000000000000", model: "claude" }, FAST);
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+    const resolved = finalizeClaim(db, id, FAST);
+    expect(resolved.resolution?.method).toBe("CONSENSUS_VOTE");
+    expect(resolved.resolution?.resolutionPolicy).toBe("consensus-vote");
+
+    // Knife-edge → DISPUTED → new validator breaks it → logit-market
+    const dbPath2 = makeDbPath();
+    const id2 = makeEvidence(dbPath2);
+    const db2 = getDb(dbPath2);
+    attestClaim(db2, id2, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db2, id2, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000", model: "claude" }, FAST);
+    challengeClaim(db2, id2, { challenger: "0xchallenger", bond: "100", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+    const disputed = finalizeClaim(db2, id2, FAST);
+    expect(disputed.state).toBe("DISPUTED");
+    attestClaim(db2, id2, { agent: "0xccc", decision: "SUPPORTED", confidence: 0.95, stake: "100000000000000000000", model: "gemini" }, FAST);
+    const ladder = finalizeClaim(db2, id2, FAST);
+    expect(ladder.resolution?.method).toBe("PREDICTION_MARKET");
+    expect(ladder.resolution?.resolutionPolicy).toBe("logit-market");
+    expect(ladder.resolution?.resolutionVersion).toBe("1.0");
+
+    // Round-trip
+    const reloaded = loadClaimState(db2, id2);
+    expect(reloaded?.resolution?.resolutionPolicy).toBe("logit-market");
+  });
+
+  it("human arbitration records human-arbitration", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.52, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.48, stake: "100000000000000000000", model: "claude" }, FAST);
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+    const disputed = finalizeClaim(db, id, FAST);
+    expect(disputed.state).toBe("DISPUTED");
+
+    const resolved = arbitrateClaim(db, id, { result: true, expert: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" });
+    expect(resolved.resolution?.resolutionPolicy).toBe("human-arbitration");
+    expect(resolved.resolution?.resolutionVersion).toBe("1.0");
+  });
+});
+
 describe("V7 resolution-root verification (recomputable root)", () => {
   it("computeResolutionRoot is deterministic and stable across reloads", async () => {
     const dbPath = makeDbPath();

@@ -120,7 +120,9 @@ export function ensureProtocolSchema(db: Db): void {
       tx_hash           TEXT,
       block_number      INTEGER,
       resolution_root   TEXT,
-      effective_votes   REAL
+      effective_votes   REAL,
+      resolution_policy TEXT,
+      resolution_version TEXT
     );
   `);
   // Migration: add effective_votes to existing databases (CREATE TABLE IF NOT
@@ -128,6 +130,13 @@ export function ensureProtocolSchema(db: Db): void {
   const cols = db.prepare("PRAGMA table_info(resolutions)").all() as Array<{ name: string }>;
   if (!cols.some((c) => c.name === "effective_votes")) {
     db.exec("ALTER TABLE resolutions ADD COLUMN effective_votes REAL");
+  }
+  // V24: resolution policy/version metadata
+  if (!cols.some((c) => c.name === "resolution_policy")) {
+    db.exec("ALTER TABLE resolutions ADD COLUMN resolution_policy TEXT");
+  }
+  if (!cols.some((c) => c.name === "resolution_version")) {
+    db.exec("ALTER TABLE resolutions ADD COLUMN resolution_version TEXT");
   }
 
   // Migration: add policy / search_provider / sources to attestations
@@ -261,6 +270,8 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
         resolution_root: string | null;
         id: string;
         effective_votes: number | null;
+        resolution_policy: string | null;
+        resolution_version: string | null;
       }
     | undefined;
   if (res) {
@@ -277,6 +288,8 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
       blockNumber: res.block_number ?? undefined,
       resolutionRoot: res.resolution_root ?? undefined,
       effectiveVotes: res.effective_votes ?? undefined,
+      resolutionPolicy: res.resolution_policy ?? undefined,
+      resolutionVersion: res.resolution_version ?? undefined,
     };
   }
 
@@ -360,8 +373,9 @@ function saveState(db: Db, state: ClaimResolutionState): void {
     db.prepare(
       `INSERT OR REPLACE INTO resolutions
          (id, evidence_id, result, final_probability, method, tier, basis,
-          resolved_at, tx_hash, block_number, resolution_root, effective_votes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          resolved_at, tx_hash, block_number, resolution_root, effective_votes,
+          resolution_policy, resolution_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       state.resolution.id,
       state.id,
@@ -375,6 +389,8 @@ function saveState(db: Db, state: ClaimResolutionState): void {
       state.resolution.blockNumber ?? null,
       state.resolution.resolutionRoot ?? null,
       state.resolution.effectiveVotes ?? null,
+      state.resolution.resolutionPolicy ?? null,
+      state.resolution.resolutionVersion ?? null,
     );
   }
 }

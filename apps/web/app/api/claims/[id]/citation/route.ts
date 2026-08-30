@@ -48,6 +48,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       result: state?.resolution?.result ?? null,
       finalProbability: state?.resolution?.finalProbability ?? pkg.assessment.confidence,
       resolutionId: state?.resolution?.id,
+      resolutionPolicy: state?.resolution?.resolutionPolicy,
+      resolutionVersion: state?.resolution?.resolutionVersion,
     },
     // V23: machine-readable Proof Status — who attested, with what stake,
     // and how many challenges were raised (teacher doc).

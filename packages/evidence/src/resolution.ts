@@ -179,6 +179,8 @@ function optimisticFinalize(
     basis: [firstAttestation.id],
     resolvedAt: now,
     effectiveVotes: 1, // single independent attestation
+    resolutionPolicy: "optimistic-v1", // unchallenged single-attestor fast path
+    resolutionVersion: "1.0",
   };
 
   return {
@@ -304,6 +306,8 @@ function consensusResolution(
     basis: escalated ? [] : updatedAttestations.filter((a) => !a.slashed).map((a) => a.id),
     resolvedAt: now,
     effectiveVotes: Math.round(effectiveVotes * 1000) / 1000, // Σ independence
+    resolutionPolicy: fromDispute ? "logit-market" : "consensus-vote",
+    resolutionVersion: "1.0",
   };
 
   // V14: a knife-edge dispute is NOT a terminal resolution. The claim stays
@@ -394,6 +398,8 @@ export function arbitrateResolution(
     basis: [ruling.expert], // the expert's ruling drives the outcome
     resolvedAt: now,
     effectiveVotes: Math.round(computeIndependence(claim.attestations).reduce((sum, v) => sum + v, 0) * 1000) / 1000,
+    resolutionPolicy: "human-arbitration", // L4 expert adjudication
+    resolutionVersion: "1.0",
   };
 
   return {

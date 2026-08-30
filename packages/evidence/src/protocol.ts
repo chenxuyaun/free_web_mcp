@@ -151,6 +151,11 @@ export interface ClaimResolution {
   /** Effective independent votes behind the resolution (teacher §13):
    *  sum of per-attestation independence, always ≤ basis count. */
   effectiveVotes?: number;
+  /** Resolution policy identifier — which mechanism was used (teacher doc:
+   *  every Claim must record its resolutionMethod and resolutionPolicy). */
+  resolutionPolicy?: string; // "optimistic-v1" | "consensus-vote" | "logit-market" | "human-arbitration"
+  /** Version of the resolution policy that produced this outcome. */
+  resolutionVersion?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +191,8 @@ export interface CitationEnvelope {
     result: boolean | null;
     finalProbability: number;
     resolutionId?: string;
+    resolutionPolicy?: string;
+    resolutionVersion?: string;
   };
   /** Verification provenance (teacher doc: Proof Status is machine-readable). */
   verification: {
