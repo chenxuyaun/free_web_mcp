@@ -8,7 +8,9 @@
 import type Database from "better-sqlite3";
 import {
   brierScore,
+  canonicalJson,
   finalizeResolution,
+  sha256,
   submitAttestation,
   submitChallenge,
   DEFAULT_OPTIMISTIC_CONFIG,
@@ -20,6 +22,38 @@ import {
   type OptimisticConfig,
 } from "@free-web-mcp/evidence";
 type Db = Database.Database;
+
+/** Recompute the resolution root (teacher §21: sha256 over attestations +
+ *  challenges + outcome, so settlement is recomputable). This is the SINGLE
+ *  source of truth — both the finalize route (anchoring) and the verify
+ *  route (on-chain check) must use it so the local root always matches. */
+export function computeResolutionRoot(state: ClaimResolutionState): string {
+  const res = state.resolution;
+  if (!res) throw new Error("No resolution to compute a root from");
+  const rootInput = {
+    attestations: state.attestations.map((a) => ({
+      agent: a.agent,
+      decision: a.decision,
+      confidence: a.confidence,
+      stake: a.stake,
+      model: a.model ?? null,
+      searchProvider: a.searchProvider ?? null,
+      sources: a.sources ?? null,
+      reputation: a.reputation ?? null,
+      slashed: a.slashed ?? false,
+    })),
+    challenges: state.challenges.map((c) => ({
+      challenger: c.challenger,
+      bond: c.bond,
+      state: c.state,
+      challengerWon: c.challengerWon ?? null,
+    })),
+    result: res.result,
+    finalProbability: res.finalProbability,
+    method: res.method,
+  } as unknown as Parameters<typeof canonicalJson>[0];
+  return sha256(canonicalJson(rootInput));
+}
 
 // ---------------------------------------------------------------------------
 // Schema (idempotent — safe on every open)

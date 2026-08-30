@@ -112,6 +112,26 @@ export class EvidenceRegistryClient {
     });
   }
 
+  /** The on-chain resolution record for a claim (V7 verification): result,
+   *  method, resolution root, timestamp, resolver. */
+  async getResolution(hash: Hex): Promise<{
+    claimHash: Hex;
+    result: boolean;
+    method: string;
+    resolutionRoot: Hex;
+    timestamp: bigint;
+    resolver: Hex;
+    exists: boolean;
+  }> {
+    const rec = await this.publicClient.readContract({
+      address: this.registryAddress,
+      abi: EVIDENCE_REGISTRY_ABI,
+      functionName: "getResolution",
+      args: [hash],
+    });
+    return rec;
+  }
+
   /** Anchor the final resolution of a claim (V1 protocol).
    *  One tx per finalized claim: result + method + resolutionRoot. */
   async resolveClaim(

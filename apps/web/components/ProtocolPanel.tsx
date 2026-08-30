@@ -62,6 +62,12 @@ export function ProtocolPanel({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [verifyResult, setVerifyResult] = useState<{
+    rootMatch: boolean;
+    verified: boolean;
+    onChainRoot: string | null;
+    localRoot: string;
+  } | null>(null);
 
   // Attest form
   const [agent, setAgent] = useState("0x60a0Ee9e28b609B740A3588121C7C2B34FE64eF4");
@@ -149,6 +155,19 @@ export function ProtocolPanel({ id }: { id: string }) {
     setBusy(null);
   }
 
+  async function verifyOnChain() {
+    setBusy("verify");
+    setError(null);
+    const res = await fetch(`${BASE_PATH}/api/claims/${id}/verify`, { cache: "no-store" });
+    const body = await res.json();
+    if (!res.ok || !body.success) {
+      setError(body.error?.message ?? "Verification failed");
+    } else {
+      setVerifyResult(body.verification);
+    }
+    setBusy(null);
+  }
+
   const deadline = state?.challengeDeadline
     ? new Date(state.challengeDeadline * 1000).toLocaleString()
     : null;
@@ -213,6 +232,27 @@ export function ProtocolPanel({ id }: { id: string }) {
                 </div>
               )}
               <div className="text-violet-400">resolved {new Date(state.resolution.resolvedAt).toLocaleString()}</div>
+              <button
+                onClick={verifyOnChain}
+                disabled={busy !== null}
+                className="mt-1 inline-flex items-center gap-1.5 rounded border border-violet-800 bg-violet-950/40 px-2 py-1 text-[11px] font-semibold text-violet-300 hover:bg-violet-900/50 disabled:opacity-50"
+              >
+                {busy === "verify" ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                Verify on-chain
+              </button>
+              {verifyResult && (
+                <div className={`mt-1 rounded px-2 py-1 text-[11px] ${verifyResult.verified ? "bg-emerald-950/30 text-emerald-400" : "bg-rose-950/30 text-rose-400"}`}>
+                  {verifyResult.verified
+                    ? "✓ On-chain resolution verified — root matches"
+                    : verifyResult.onChainRoot
+                      ? "✗ Root mismatch! Local ≠ on-chain"
+                      : "? Not found on-chain"}
+                  <span className="ml-2 text-neutral-500">
+                    local: {verifyResult.localRoot.slice(0, 12)}…
+                    {verifyResult.onChainRoot && ` | chain: ${verifyResult.onChainRoot.slice(0, 12)}…`}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

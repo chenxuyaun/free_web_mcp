@@ -4,7 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { buildEvidencePackage, sha256, type EvidenceSource, type OptimisticConfig } from "@free-web-mcp/evidence";
 import { closeDb, getDb, getValidatorStats, insertEvidence } from "../lib/db";
-import { attestClaim, challengeClaim, finalizeClaim, loadClaimState } from "../lib/protocol-db";
+import {
+  attestClaim,
+  challengeClaim,
+  computeResolutionRoot,
+  finalizeClaim,
+  loadClaimState,
+} from "../lib/protocol-db";
 
 /** Short challenge window so finalize works immediately in tests. */
 const FAST: OptimisticConfig = {
@@ -277,5 +283,47 @@ describe("V6 challenge bond settlement (SQLite-backed)", () => {
     const stats = getValidatorStats(challenger, dbPath);
     expect(stats?.successfulChallenges).toBe(1);
     expect(stats?.reputation).toBeCloseTo(1.0, 5);
+  });
+});
+
+describe("V7 resolution-root verification (recomputable root)", () => {
+  it("computeResolutionRoot is deterministic and stable across reloads", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000", model: "claude" }, FAST);
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    const root1 = computeResolutionRoot(state);
+    expect(root1).toMatch(/^[0-9a-f]{64}$/);
+
+    // Reload from SQLite — the root must be recomputable identically
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded).not.toBeNull();
+    const root2 = computeResolutionRoot(reloaded!);
+    expect(root2).toBe(root1);
+  });
+
+  it("root changes when attestation content changes (detects tampering)", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    const root1 = computeResolutionRoot(state);
+
+    // Tamper: mutate the first attestation's confidence in memory
+    const tampered = loadClaimState(db, id)!;
+    tampered.attestations[0].confidence = 0.99;
+    const root2 = computeResolutionRoot(tampered);
+    expect(root2).not.toBe(root1);
   });
 });

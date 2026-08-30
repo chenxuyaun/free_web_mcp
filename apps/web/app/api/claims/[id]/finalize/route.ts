@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { canonicalJson, sha256 } from "@free-web-mcp/evidence";
 import { getRegistryClient } from "@/lib/blockchain";
 import { getDb, markAnchored } from "@/lib/db";
-import { finalizeClaim, loadClaimState } from "@/lib/protocol-db";
+import { computeResolutionRoot, finalizeClaim, loadClaimState } from "@/lib/protocol-db";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -49,29 +48,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (body.confirm === true) {
       // Compute the resolution root: sha256 over attestations + challenges +
       // outcome (teacher §21: merkle-style root so settlement is recomputable).
-      const rootInput = {
-        attestations: state.attestations.map((a) => ({
-          agent: a.agent,
-          decision: a.decision,
-          confidence: a.confidence,
-          stake: a.stake,
-          model: a.model ?? null,
-          searchProvider: a.searchProvider ?? null,
-          sources: a.sources ?? null,
-          reputation: a.reputation ?? null,
-          slashed: a.slashed ?? false,
-        })),
-        challenges: state.challenges.map((c) => ({
-          challenger: c.challenger,
-          bond: c.bond,
-          state: c.state,
-          challengerWon: c.challengerWon ?? null,
-        })),
-        result: res.result,
-        finalProbability: res.finalProbability,
-        method: res.method,
-      } as unknown as Parameters<typeof canonicalJson>[0];
-      resolutionRoot = sha256(canonicalJson(rootInput));
+      // Shared with the verify route so the local root always matches what
+      // gets anchored.
+      resolutionRoot = computeResolutionRoot(state);
 
       const client = getRegistryClient();
       const anchor = await client.resolveClaim(

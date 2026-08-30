@@ -4,6 +4,24 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.7] - 2026-08-30
+
+### Added — V7 on-chain resolution verification (the verifiable loop closes)
+
+- `EvidenceRegistryClient.getResolution(hash)` reads the full on-chain
+  resolution record (result, method, root, timestamp, resolver).
+- New `GET /api/claims/[id]/verify`: recomputes the local resolution root
+  from the claim state and compares it against the on-chain record —
+  `verified` is TRUE only when `isResolved` AND roots match, proving the
+  final outcome was honestly anchored and not tampered with.
+- `computeResolutionRoot` extracted as the single shared implementation used
+  by both the finalize route (anchoring) and the verify route, so the local
+  root can never drift from what gets written on-chain.
+- Dashboard: "Verify on-chain" button on resolved claims shows
+  root-match status (✓ verified / ✗ mismatch / not found).
+- 2 web tests: root deterministic + stable across reloads; root changes on
+  tampering — 83 total across the monorepo.
+
 ## [0.5.6] - 2026-08-30
 
 ### Added — V6 challenge bond settlement (economically-risked disputes)
