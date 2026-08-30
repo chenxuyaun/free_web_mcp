@@ -64,6 +64,9 @@ oracle ladder, and agent participation. All live-verified on yuncai.site.
 | V15 | Citation envelope UI — one-click copy for AI consumption | yuncai.site evidence detail page, §19-§22 |
 | V16 | MCP get_citation tool (14 tools) | EV-000026 citation via public MCP endpoint |
 
+| V17 | Real source quotes in citation envelopes (§19-§22) | EV-000027: citation returns verbatim source quote + quoteHash |
+| V18 | Prediction market aggregation — log-odds belief pool (§25-§27) | EV-000028: market 0.8223 vs weighted avg 0.6633, method PREDICTION_MARKET |
+
 ## Not done (honest)
 
 | Item | Why |

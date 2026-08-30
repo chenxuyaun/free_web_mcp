@@ -4,6 +4,21 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.16] - 2026-08-30
+
+### Added — V18 prediction market: log-odds belief pool (teacher §25-§27)
+
+- `logitPool(entries)`: market-aggregated probability via log-odds belief
+  pool — each validator's stake-weighted confidence aggregated in logit
+  space, where extreme beliefs pull the price harder than a plain weighted
+  average (how a real prediction market prices outcomes).
+- `consensusResolution` now uses logitPool when resolving a claim that went
+  through the ladder (DISPUTED → decisive → PREDICTION_MARKET), keeping
+  CONSENSUS_VOTE for direct CHALLENGED resolutions.
+- Live-verified: EV-000028 — two knife-edge votes + one 0.99 → market
+  probability 0.8223 vs weighted average 0.6633 (the strong belief priced
+  higher than a plain average).
+
 ## [0.5.15] - 2026-08-30
 
 ### Added — V17 real source quotes in citation envelopes (teacher §19-§22)
