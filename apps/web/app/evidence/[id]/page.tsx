@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AnchorButton } from "@/components/AnchorButton";
 import { PublishButton } from "@/components/PublishButton";
 import { CopyButton } from "@/components/CopyButton";
+import { CitationEnvelope } from "@/components/CitationEnvelope";
 import { ExportButton } from "@/components/ExportButton";
 import { Timeline } from "@/components/Timeline";
 import { ValidatorPanel } from "@/components/ValidatorPanel";
@@ -168,6 +169,10 @@ export default async function EvidenceDetailPage({
 
       <Section title="Verification Protocol (V1)">
         <ProtocolPanel id={pkg.id} />
+      </Section>
+
+      <Section title="Citation Envelope (AI-ready, teacher §19-§22)">
+        <CitationEnvelope id={pkg.id} />
       </Section>
 
       <Section title="Validator Vote (spec §25-26)">
