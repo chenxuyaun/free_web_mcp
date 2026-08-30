@@ -74,9 +74,16 @@ export function ensureProtocolSchema(db: Db): void {
       resolved_at       TEXT NOT NULL,
       tx_hash           TEXT,
       block_number      INTEGER,
-      resolution_root   TEXT
+      resolution_root   TEXT,
+      effective_votes   REAL
     );
   `);
+  // Migration: add effective_votes to existing databases (CREATE TABLE IF NOT
+  // EXISTS does not add columns to an already-created table).
+  const cols = db.prepare("PRAGMA table_info(resolutions)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "effective_votes")) {
+    db.exec("ALTER TABLE resolutions ADD COLUMN effective_votes REAL");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +185,7 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
         block_number: number | null;
         resolution_root: string | null;
         id: string;
+        effective_votes: number | null;
       }
     | undefined;
   if (res) {
@@ -193,6 +201,7 @@ export function loadClaimState(db: Db, evidenceId: string): ClaimResolutionState
       txHash: res.tx_hash ?? undefined,
       blockNumber: res.block_number ?? undefined,
       resolutionRoot: res.resolution_root ?? undefined,
+      effectiveVotes: res.effective_votes ?? undefined,
     };
   }
 
@@ -268,8 +277,8 @@ function saveState(db: Db, state: ClaimResolutionState): void {
     db.prepare(
       `INSERT OR REPLACE INTO resolutions
          (id, evidence_id, result, final_probability, method, tier, basis,
-          resolved_at, tx_hash, block_number, resolution_root)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          resolved_at, tx_hash, block_number, resolution_root, effective_votes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       state.resolution.id,
       state.id,
@@ -282,6 +291,7 @@ function saveState(db: Db, state: ClaimResolutionState): void {
       state.resolution.txHash ?? null,
       state.resolution.blockNumber ?? null,
       state.resolution.resolutionRoot ?? null,
+      state.resolution.effectiveVotes ?? null,
     );
   }
 }
@@ -302,6 +312,12 @@ function withState(
   return updated;
 }
 
+function protocolId(prefix: string): string {
+  // Date.now() alone collides for calls within the same millisecond (e.g.
+  // rapid attestations), which would silently overwrite a row via upsert.
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function attestClaim(
   db: Db,
   evidenceId: string,
@@ -311,7 +327,7 @@ export function attestClaim(
   const now = new Date().toISOString();
   const att: Attestation = {
     ...input,
-    id: `ATT-${Date.now().toString(36)}`,
+    id: protocolId("ATT"),
     claimId: evidenceId,
     createdAt: now,
   };
@@ -326,7 +342,7 @@ export function challengeClaim(
   const now = new Date().toISOString();
   const chl: Challenge = {
     ...input,
-    id: `CHL-${Date.now().toString(36)}`,
+    id: protocolId("CHL"),
     claimId: evidenceId,
     state: "OPEN",
     createdAt: now,

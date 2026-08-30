@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
 import {
+  describe, expect, it,
+} from "vitest";
+import {
+  attestationCorrelation,
   brierScore,
+  canTransition,
+  computeIndependence,
+  effectiveVotes,
   logScore,
   nextClaimState,
-  canTransition,
   attestationMatchesResolution,
   type Attestation,
 } from "../src/protocol";
@@ -196,5 +201,171 @@ describe("resolution engine", () => {
     expect(resolved.attestations[0].slashed).toBe(true);
     // attestor2 (CONTRADICTED) was right → not slashed
     expect(resolved.attestations[1].slashed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V2 Independence scoring (teacher §12-§13)
+// ---------------------------------------------------------------------------
+
+describe("V2 independence scoring", () => {
+  const a = (overrides: Partial<Attestation> = {}): Attestation => ({
+    id: "a",
+    claimId: "c",
+    agent: "agent-A",
+    decision: "SUPPORTED",
+    confidence: 0.8,
+    stake: "100000000000000000000",
+    createdAt: "2026-08-29T00:00:00.000Z",
+    ...overrides,
+  });
+
+  describe("attestationCorrelation", () => {
+    it("same agent → 1.0 (identical information pipeline)", () => {
+      expect(attestationCorrelation(a({ agent: "0xalice" }), a({ agent: "0xalice" }))).toBe(1.0);
+    });
+
+    it("same model → 0.7", () => {
+      expect(attestationCorrelation(a({ model: "gpt-4" }), a({ agent: "agent-B", model: "gpt-4" }))).toBe(0.7);
+    });
+
+    it("same policy → 0.3", () => {
+      expect(attestationCorrelation(a({ policy: "search-v2" }), a({ agent: "agent-B", policy: "search-v2" }))).toBe(0.3);
+    });
+
+    it("same model + same policy → 1.0 (capped)", () => {
+      const c = attestationCorrelation(
+        a({ model: "gpt-4", policy: "search-v2" }),
+        a({ agent: "agent-B", model: "gpt-4", policy: "search-v2" }),
+      );
+      expect(c).toBe(1.0);
+    });
+
+    it("different model, policy, agent → 0", () => {
+      expect(attestationCorrelation(a({ model: "gpt-4" }), a({ agent: "agent-B", model: "claude" }))).toBe(0);
+    });
+  });
+
+  describe("computeIndependence", () => {
+    it("single attestation → fully independent [1.0]", () => {
+      expect(computeIndependence([a()])).toEqual([1.0]);
+    });
+
+    it("two identical model agents → each 0.3 independent", () => {
+      const scores = computeIndependence([
+        a({ id: "a1", model: "gpt-4" }),
+        a({ id: "a2", agent: "agent-B", model: "gpt-4" }),
+      ]);
+      expect(scores[0]).toBeCloseTo(0.3, 5);
+      expect(scores[1]).toBeCloseTo(0.3, 5);
+    });
+
+    it("two fully distinct agents → each 1.0", () => {
+      const scores = computeIndependence([
+        a({ id: "a1", model: "gpt-4", policy: "v1" }),
+        a({ id: "a2", agent: "agent-B", model: "claude", policy: "v2" }),
+      ]);
+      expect(scores[0]).toBe(1.0);
+      expect(scores[1]).toBe(1.0);
+    });
+
+    it("three same-model agents → each 0.3 effective", () => {
+      const scores = computeIndependence([
+        a({ id: "a1", model: "gemini" }),
+        a({ id: "a2", agent: "agent-B", model: "gemini" }),
+        a({ id: "a3", agent: "agent-C", model: "gemini" }),
+      ]);
+      // Each correlated with 2 others at 0.7 → independence = 1 - 0.7 = 0.3
+      scores.forEach(s => expect(s).toBeCloseTo(0.3, 5));
+    });
+  });
+
+  describe("effectiveVotes", () => {
+    it("5 distinct agents → ~5 effective votes", () => {
+      const ev = effectiveVotes([
+        a({ id: "a1", agent: "ag1", model: "gpt-4" }),
+        a({ id: "a2", agent: "ag2", model: "claude" }),
+        a({ id: "a3", agent: "ag3", model: "gemini" }),
+        a({ id: "a4", agent: "ag4", model: "llama" }),
+        a({ id: "a5", agent: "ag5", model: "mistral" }),
+      ]);
+      expect(ev).toBeCloseTo(5.0, 5);
+    });
+
+    it("3 same-model agents → ~0.9 effective votes (≈3 × 0.3)", () => {
+      const ev = effectiveVotes([
+        a({ id: "a1", model: "gpt-4" }),
+        a({ id: "a2", agent: "agent-B", model: "gpt-4" }),
+        a({ id: "a3", agent: "agent-C", model: "gpt-4" }),
+      ]);
+      expect(ev).toBeCloseTo(0.9, 5);
+    });
+  });
+
+  describe("consensus weighted by stake × independence", () => {
+    const SHORT_WINDOW: OptimisticConfig = {
+      ...DEFAULT_OPTIMISTIC_CONFIG,
+      challengeWindowSec: 60,
+    };
+
+    it("correlated model votes weigh less than diverse ones", () => {
+      // Two same-model agents say TRUE (confidence 0.9), one diverse says FALSE (0.1)
+      // With straight stake weighting: 2:1 for TRUE → finalProbability ≈ 0.633
+      // With independence weighting: the two same-model get 0.3 each, the diverse gets 1.0
+      //   effective weight: 2×0.3 vs 1×1.0 → 0.6 vs 1.0 → finalProbability ≈ 0.375
+      //   → result FALSE because the diverse agent's vote outweighs the correlated pair
+      const claim = makeClaim();
+      const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" });
+      const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "gpt-4", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" });
+      const a3 = makeAttestation({ id: "att-3", agent: "ag3", model: "claude", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000" });
+
+      const attested = submitAttestation(claim, a1, SHORT_WINDOW);
+      const attested2 = submitAttestation(attested, a2, SHORT_WINDOW);
+      const attested3 = submitAttestation(attested2, a3, SHORT_WINDOW);
+
+      const challenged = submitChallenge(attested3, {
+        id: "chl-1",
+        claimId: "claim-1",
+        challenger: "0xchallenger",
+        bond: "100000000000000000000",
+        state: "OPEN",
+        createdAt: "2026-08-29T02:00:00.000Z",
+      });
+
+      const later = new Date(Date.now() + 120_000).toISOString();
+      const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
+
+      expect(resolved.resolution?.method).toBe("CONSENSUS_VOTE");
+      // The diverse agent's independence outweighs the correlated pair
+      expect(resolved.resolution?.result).toBe(false);
+      expect(resolved.resolution?.effectiveVotes).toBeCloseTo(1.6, 1); // 0.3 + 0.3 + 1.0
+      // Raw attestations = 3, but effectiveVotes < 3
+      expect(resolved.resolution?.effectiveVotes).toBeLessThan(3);
+    });
+
+    it("all diverse agents → effectiveVotes ≈ raw count", () => {
+      const claim = makeClaim();
+      const a1 = makeAttestation({ id: "att-1", agent: "ag1", model: "gpt-4", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" });
+      const a2 = makeAttestation({ id: "att-2", agent: "ag2", model: "claude", decision: "SUPPORTED", confidence: 0.8, stake: "100000000000000000000" });
+      const a3 = makeAttestation({ id: "att-3", agent: "ag3", model: "gemini", decision: "CONTRADICTED", confidence: 0.2, stake: "100000000000000000000" });
+
+      const attested = submitAttestation(claim, a1, SHORT_WINDOW);
+      const attested2 = submitAttestation(attested, a2, SHORT_WINDOW);
+      const attested3 = submitAttestation(attested2, a3, SHORT_WINDOW);
+
+      const challenged = submitChallenge(attested3, {
+        id: "chl-1",
+        claimId: "claim-1",
+        challenger: "0xchallenger",
+        bond: "100000000000000000000",
+        state: "OPEN",
+        createdAt: "2026-08-29T02:00:00.000Z",
+      });
+
+      const later = new Date(Date.now() + 120_000).toISOString();
+      const resolved = finalizeResolution(challenged, SHORT_WINDOW, later);
+
+      expect(resolved.resolution?.effectiveVotes).toBeCloseTo(3.0, 1);
+    });
   });
 });

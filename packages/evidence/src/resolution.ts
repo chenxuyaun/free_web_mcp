@@ -18,6 +18,7 @@ import {
   type ClaimResolution,
   type ClaimState,
   attestationMatchesResolution,
+  computeIndependence,
 } from "./protocol";
 
 // ---------------------------------------------------------------------------
@@ -175,6 +176,7 @@ function optimisticFinalize(
     tier: "L2_AI_VALIDATORS",
     basis: [firstAttestation.id],
     resolvedAt: now,
+    effectiveVotes: 1, // single independent attestation
   };
 
   return {
@@ -190,16 +192,25 @@ function consensusResolution(
   config: OptimisticConfig,
   now: string,
 ): ClaimResolutionState {
-  // Weight each attestation by its stake to compute the final probability
+  // V2 (teacher §12-§13): weight each attestation by stake × independence.
+  // Attestations sharing the same model/policy are correlated — their votes
+  // count for less, so 100 same-model agents weigh less than 5 diverse ones.
+  const independence = computeIndependence(claim.attestations);
+  const IND_SCALE = 1_000_000n; // fixed-point scale for independence ∈ [0,1]
+
   let totalWeight = 0n;
   let weightedSum = 0n;
+  let effectiveVotes = 0;
 
-  for (const att of claim.attestations) {
-    const weight = BigInt(att.stake);
-    // Convert confidence (0..1) to a weighted sum
+  for (let i = 0; i < claim.attestations.length; i++) {
+    const att = claim.attestations[i];
+    const ind = independence[i];
+    // influence = stake × independence (in fixed point)
+    const weight = (BigInt(att.stake) * BigInt(Math.round(ind * 1_000_000))) / IND_SCALE;
     const scaled = BigInt(Math.round(att.confidence * 1_000_000));
     weightedSum += weight * scaled;
     totalWeight += weight;
+    effectiveVotes += ind;
   }
 
   const finalProbability = totalWeight > 0n
@@ -245,6 +256,7 @@ function consensusResolution(
     tier: "L2_AI_VALIDATORS",
     basis: updatedAttestations.filter((a) => !a.slashed).map((a) => a.id),
     resolvedAt: now,
+    effectiveVotes: Math.round(effectiveVotes * 1000) / 1000, // Σ independence
   };
 
   return {

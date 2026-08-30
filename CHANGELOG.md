@@ -4,6 +4,25 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-08-30
+
+### Added — V2 independence-weighted consensus (teacher §12-§13)
+
+- `attestationCorrelation(a, b)`: dependency heuristic — same agent = 1.0,
+  same `model` = 0.7, same `policy` = 0.3 (capped at 1.0).
+- `computeIndependence(attestations)`: per-attestation score = 1 − max
+  pairwise correlation. 100 same-model agents ≈ 1 information source.
+- `effectiveVotes(attestations)`: Σ independence — the effective number of
+  independent votes behind a claim.
+- Consensus resolution now weights by **stake × independence** instead of raw
+  stake, so a correlated swarm can no longer dominate a diverse minority.
+  `ClaimResolution.effectiveVotes` records the true independent vote count.
+- Dashboard: model field in attest form, model shown per attestation,
+  resolution shows "N attestations → X.XX effective independent votes".
+- Bugfix: attestation/challenge ids now include a random suffix —
+  `Date.now()` alone collided for rapid submissions and silently overwrote
+  rows via the upsert.
+
 ## [0.5.0] - 2026-08-30
 
 ### Added — Verifiable Knowledge Protocol V1 (teacher's framework)

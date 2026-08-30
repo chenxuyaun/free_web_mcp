@@ -107,3 +107,51 @@ describe("V1 protocol flow (SQLite-backed)", () => {
     expect(stats!.totalVotes).toBe(1);
   });
 });
+
+describe("V2 independence-weighted consensus (SQLite-backed)", () => {
+  it("persists effective_votes < raw attestation count for correlated models", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    // Two same-model agents say SUPPORTED, one diverse agent says CONTRADICTED.
+    // independence: gpt-4o pair → 0.3 each, claude → 1.0. Weighted: 0.3+0.3 vs 1.0
+    // → outcome flips to the diverse agent's side.
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xccc", decision: "CONTRADICTED", confidence: 0.1, stake: "100000000000000000000", model: "claude-sonnet" }, FAST);
+
+    const challenged = challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
+    expect(challenged.state).toBe("CHALLENGED");
+
+    // let the 1s challenge window close
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    expect(state.state).toBe("RESOLVED");
+    expect(state.resolution?.method).toBe("CONSENSUS_VOTE");
+    // The diverse claude vote outweighs the correlated gpt-4o pair
+    expect(state.resolution?.result).toBe(false);
+    expect(state.resolution?.effectiveVotes).toBeCloseTo(1.6, 1);
+
+    // Reload from disk — effective_votes must round-trip through SQLite
+    const reloaded = loadClaimState(db, id);
+    expect(reloaded?.resolution?.effectiveVotes).toBeCloseTo(1.6, 1);
+  });
+
+  it("all-distinct models → effective_votes ≈ raw count", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+
+    attestClaim(db, id, { agent: "0xaaa", decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000", model: "gpt-4o" }, FAST);
+    attestClaim(db, id, { agent: "0xbbb", decision: "SUPPORTED", confidence: 0.8, stake: "100000000000000000000", model: "claude-sonnet" }, FAST);
+    attestClaim(db, id, { agent: "0xccc", decision: "CONTRADICTED", confidence: 0.2, stake: "100000000000000000000", model: "gemini-pro" }, FAST);
+
+    challengeClaim(db, id, { challenger: "0xchallenger", bond: "100000000000000000000", reason: "dispute" });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const state = finalizeClaim(db, id, FAST);
+    expect(state.resolution?.effectiveVotes).toBeCloseTo(3.0, 1);
+  });
+});

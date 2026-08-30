@@ -16,6 +16,7 @@ interface ClaimStateView {
     slashed?: boolean;
     reward?: string;
     rationale?: string;
+    model?: string;
   }>;
   challenges: Array<{
     id: string;
@@ -29,6 +30,7 @@ interface ClaimStateView {
     finalProbability: number;
     method: string;
     resolvedAt: string;
+    effectiveVotes?: number;
   } | null;
   challengeDeadline: number | null;
 }
@@ -62,6 +64,7 @@ export function ProtocolPanel({ id }: { id: string }) {
   const [confidence, setConfidence] = useState("0.9");
   const [stake, setStake] = useState("100000000000000000000");
   const [rationale, setRationale] = useState("");
+  const [model, setModel] = useState("");
 
   async function refresh() {
     const res = await fetch(`${BASE_PATH}/api/claims/${id}`, { cache: "no-store" });
@@ -89,6 +92,7 @@ export function ProtocolPanel({ id }: { id: string }) {
         confidence: Number(confidence),
         stake,
         rationale: rationale || undefined,
+        model: model || undefined,
       }),
     });
     const body = await res.json();
@@ -145,7 +149,7 @@ export function ProtocolPanel({ id }: { id: string }) {
   return (
     <section className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-5">
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-        Verification Protocol (V1)
+        Verification Protocol (V2 — independence-weighted)
       </h2>
 
       {loading ? (
@@ -190,6 +194,12 @@ export function ProtocolPanel({ id }: { id: string }) {
                   ({Math.round(state.resolution.finalProbability * 100)}%, {state.resolution.method})
                 </span>
               </div>
+              {state.resolution.effectiveVotes !== undefined && (
+                <div className="text-violet-400">
+                  {state.attestations.length} attestation(s) → {state.resolution.effectiveVotes.toFixed(2)} effective independent
+                  votes (V2, teacher §13)
+                </div>
+              )}
               <div className="text-violet-400">resolved {new Date(state.resolution.resolvedAt).toLocaleString()}</div>
             </div>
           )}
@@ -218,6 +228,7 @@ export function ProtocolPanel({ id }: { id: string }) {
                       </span>
                       <span className="text-neutral-500">{Math.round(a.confidence * 100)}%</span>
                       <span className="text-neutral-500">{Number(a.stake) / 1e18} VERI</span>
+                      {a.model && <span className="text-neutral-500">{a.model}</span>}
                       {a.slashed === true && (
                         <span className="text-rose-400">SLASHED</span>
                       )}
@@ -279,6 +290,15 @@ export function ProtocolPanel({ id }: { id: string }) {
                     onChange={(e) => setRationale(e.target.value)}
                     placeholder="e.g. Reuters + SEC filing corroborate"
                     className="mt-1 w-full rounded bg-neutral-800 px-2 py-1.5 text-xs text-neutral-200"
+                  />
+                </label>
+                <label className="col-span-2 text-xs text-neutral-500">
+                  Model (drives independence scoring — same-model votes correlate)
+                  <input
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="e.g. gpt-4o, claude-sonnet (leave blank = independent)"
+                    className="mt-1 w-full rounded bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200"
                   />
                 </label>
               </div>

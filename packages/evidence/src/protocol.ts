@@ -131,6 +131,9 @@ export interface ClaimResolution {
   blockNumber?: number;
   /** Merkle root over attestations + challenge + outcome (teacher §21). */
   resolutionRoot?: string;
+  /** Effective independent votes behind the resolution (teacher §13):
+   *  sum of per-attestation independence, always ≤ basis count. */
+  effectiveVotes?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +176,44 @@ export interface CitationEnvelope {
     txHash?: string;
     network?: string;
   };}
+
+// ---------------------------------------------------------------------------
+// Agent independence (teacher §12-§13)
+// ---------------------------------------------------------------------------
+
+/** Correlation between two attestations on a 0..1 scale.
+ *  Heuristic dependency model: same agent is identical (1.0); sharing a
+ *  model is a strong signal of a shared information pipeline (0.7); sharing
+ *  a policy is weaker (0.3). */
+export function attestationCorrelation(a: Attestation, b: Attestation): number {
+  if (a.agent.toLowerCase() === b.agent.toLowerCase()) return 1.0;
+  let c = 0;
+  if (a.model && b.model && a.model === b.model) c += 0.7;
+  if (a.policy && b.policy && a.policy === b.policy) c += 0.3;
+  return Math.min(1.0, c);
+}
+
+/** Independence score of each attestation: 1 - max correlation with any
+ *  other attestation (teacher §12). 1.0 = fully independent, 0 = same
+ *  information pipeline. A single attestation is fully independent. */
+export function computeIndependence(attestations: Attestation[]): number[] {
+  if (attestations.length <= 1) return attestations.map(() => 1.0);
+  return attestations.map((a, i) => {
+    let maxCorr = 0;
+    for (let j = 0; j < attestations.length; j++) {
+      if (j === i) continue;
+      maxCorr = Math.max(maxCorr, attestationCorrelation(a, attestations[j]));
+    }
+    return 1 - maxCorr;
+  });
+}
+
+/** Effective number of independent votes (teacher §13):
+ *  effective_votes = Σ independence, so 100 same-model agents count far
+ *  less than 5 diverse ones. */
+export function effectiveVotes(attestations: Attestation[]): number {
+  return computeIndependence(attestations).reduce((sum, v) => sum + v, 0);
+}
 
 // ---------------------------------------------------------------------------
 // Protocol helpers
