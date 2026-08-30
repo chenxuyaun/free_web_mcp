@@ -67,6 +67,8 @@ oracle ladder, and agent participation. All live-verified on yuncai.site.
 | V17 | Real source quotes in citation envelopes (§19-§22) | EV-000027: citation returns verbatim source quote + quoteHash |
 | V18 | Prediction market aggregation — log-odds belief pool (§25-§27) | EV-000028: market 0.8223 vs weighted avg 0.6633, method PREDICTION_MARKET |
 
+| V19 | Human-expert arbitration (L4 oracle ladder) | EV-000029: DISPUTED → expert TRUE → HUMAN_ARBITRATION, on-chain verified |
+
 ## Not done (honest)
 
 | Item | Why |

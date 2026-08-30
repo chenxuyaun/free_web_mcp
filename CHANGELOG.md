@@ -4,6 +4,22 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.17] - 2026-08-30
+
+### Added — V19 human-expert arbitration (teacher §21/§33, L4)
+
+- `arbitrateResolution`: only DISPUTED claims are arbitrable. An expert's
+  ruling (result + expert id + rationale) produces a HUMAN_ARBITRATION /
+  L4_HUMAN_EXPERT resolution — the final rung of the oracle ladder.
+- Settles attestations (slash/reward vs the ruling) and challenges
+  (UPHELD/REJECTED); the finalize flow skips consensus entirely.
+- `POST /api/claims/[id]/arbitrate` (confirm → on-chain anchor); dashboard
+  shows an arbitration form on DISPUTED claims.
+- Live-verified: EV-000029 — knife-edge → DISPUTED → expert ruled TRUE →
+  RESOLVED (HUMAN_ARBITRATION), attestor rewarded, challenger REJECTED,
+  on-chain verified (rootMatch, resolvedOnChain).
+- 3 evidence + 2 web tests (66 + 25).
+
 ## [0.5.16] - 2026-08-30
 
 ### Added — V18 prediction market: log-odds belief pool (teacher §25-§27)
