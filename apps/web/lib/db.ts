@@ -410,12 +410,16 @@ export function recordVote(input: {
     now,
   );
 
-  // Upsert validator stats
+  // Upsert validator stats. Reputation uses the SAME running-average
+  // semantics as protocol-db's settleBrierReputations (reputation ∈ [0,1],
+  // score = 1 correct / 0 incorrect) so both writers agree — previously this
+  // ACCUMULATED (reputation = reputation + 1), which let the score drift
+  // unbounded and split the two code paths.
   db.prepare(
     `INSERT INTO validators (address, reputation, verified_claims, successful_challenges, total_votes, created_at)
      VALUES (?, ?, ?, ?, 1, ?)
      ON CONFLICT(address) DO UPDATE SET
-       reputation = reputation + ?,
+       reputation = (reputation * total_votes + ?) / (total_votes + 1),
        verified_claims = verified_claims + ?,
        successful_challenges = successful_challenges + ?,
        total_votes = total_votes + 1`,
