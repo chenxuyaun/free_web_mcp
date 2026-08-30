@@ -533,3 +533,30 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
             )
         except ToolError as exc:
             return _error_payload(exc)
+
+    @server.tool(
+        name="finalize_claim",
+        title="Finalize a Claim",
+        description=(
+            "Close the challenge window and produce the final resolution of a "
+            "claim. With confirm=true the dashboard anchors the resolution "
+            "on-chain (server-side signer, rate-limited). This is the last "
+            "step of the verification lifecycle: after finalization the "
+            "resolution, effective votes, oracle tier, and bond settlements "
+            "are final and verifiable on-chain. Use get_claim_state first to "
+            "check the window has closed or that the claim is CHALLENGED."
+        ),
+        annotations=WRITE_API,
+    )
+    async def finalize_claim(
+        evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
+        confirm: Annotated[
+            bool,
+            Field(description="Pass true to anchor the resolution on-chain (a real transaction)."),
+        ] = False,
+    ) -> dict[str, Any]:
+        try:
+            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            return client.finalize_claim(evidence_id=evidence_id, confirm=confirm)
+        except ToolError as exc:
+            return _error_payload(exc)

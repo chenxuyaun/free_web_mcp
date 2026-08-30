@@ -158,6 +158,20 @@ class EvidenceApiClient:
         }
         return self._post(f"/api/claims/{evidence_id}/challenge", payload)
 
+    def finalize_claim(
+        self,
+        evidence_id: str,
+        confirm: bool = False,
+    ) -> dict[str, object]:
+        """Close the challenge window and produce the final resolution.
+        With confirm=True the dashboard anchors the resolution on-chain
+        (server-side signer + rate limit). Requires the challenge window
+        to have closed (SUPPORTED) or an active challenge (CHALLENGED)."""
+        return self._post(
+            f"/api/claims/{evidence_id}/finalize",
+            {"confirm": confirm},
+        )
+
     def _post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
         try:
             response = httpx.post(f"{self._base}{path}", json=payload, timeout=self._timeout)

@@ -49,6 +49,7 @@ async def test_list_tools() -> None:
         "get_claim_state",
         "attest_claim",
         "challenge_claim",
+        "finalize_claim",
     }
 
 
@@ -233,3 +234,16 @@ async def test_attest_claim_wraps_dashboard_error() -> None:
     )
     assert payload["success"] is False
     assert "Cannot attest" in payload["error"]["message"]
+
+
+@respx.mock
+async def test_finalize_claim_posts_confirm() -> None:
+    route = respx.post("http://test:3000/api/claims/EV-000001/finalize").respond(
+        200,
+        json={"success": True, "state": {"id": "EV-000001", "state": "RESOLVED", "anchored": True}},
+    )
+    ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
+    payload = await call_tool(ctx, "finalize_claim", {"evidence_id": "EV-000001", "confirm": True})
+    assert payload["success"] is True
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["confirm"] is True
