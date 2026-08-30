@@ -4,6 +4,25 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.5] - 2026-08-30
+
+### Added — V5 MCP protocol tools: agents as independent evidence producers
+
+- 3 new MCP tools → **11 total**: `get_claim_state`, `attest_claim`,
+  `challenge_claim` let AI agents submit staked, metadata-rich attestations
+  (model / searchProvider / sources), dispute claims, and query lifecycle
+  state through the MCP interface.
+- `EvidenceApiClient` (Python) gains the three protocol methods; write tools
+  registered with `readOnlyHint=False`; the dashboard protocol API stays the
+  single owner of storage and chain writes.
+- Server deployment now points `EVIDENCE_API_URL` at
+  `http://web:3000/webmcp` (the dashboard basePath) so MCP→dashboard calls
+  work in the container network.
+- Live verified: EV-000020 was created and attested entirely through the
+  public MCP endpoint — model `gpt-4o`, provider `bing`, sources
+  `["https://example.com/v5"]` round-trip via `get_claim_state`.
+- 4 new MCP tests (tool list, protocol calls, error wrapping): 50→54.
+
 ## [0.5.4] - 2026-08-30
 
 ### Added — V4 oracle-ladder tier escalation (teacher §21/§33)
