@@ -53,6 +53,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     },
     // V23: machine-readable Proof Status — who attested, with what stake,
     // and how many challenges were raised (teacher doc).
+    // V27: historicalDependency (how much this validator has historically
+    // agreed with the others on this claim) is part of the proof status.
     verification: {
       validators: (state?.attestations ?? []).map((a) => ({
         agent: a.agent,
@@ -62,6 +64,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         reputation: a.reputation,
         model: a.model,
         slashed: a.slashed,
+        historicalDependency: a.historicalDependency,
       })),
       challengeCount: state?.challenges.length ?? 0,
     },
