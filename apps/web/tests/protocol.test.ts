@@ -10,6 +10,7 @@ import {
   computeResolutionRoot,
   finalizeClaim,
   loadClaimState,
+  type ScoringRule,
 } from "../lib/protocol-db";
 
 /** Short challenge window so finalize works immediately in tests. */
@@ -325,5 +326,45 @@ describe("V7 resolution-root verification (recomputable root)", () => {
     tampered.attestations[0].confidence = 0.99;
     const root2 = computeResolutionRoot(tampered);
     expect(root2).not.toBe(root1);
+  });
+});
+
+describe("V10 proper scoring rules (teacher §9-§10)", () => {
+  it("brier and log rules settle different reputations for the same confidence", async () => {
+    // Same setup for both rules
+    async function finalizeWith(rule: ScoringRule) {
+      const dbPath = makeDbPath();
+      const id = makeEvidence(dbPath);
+      const db = getDb(dbPath);
+      const agent = "0x60a0Ee9e28b609B740A3588121C7C2B34FE64eF4";
+      // confidence 0.9 SUPPORTED → outcome TRUE
+      attestClaim(db, id, { agent, decision: "SUPPORTED", confidence: 0.9, stake: "100000000000000000000" }, FAST);
+      await new Promise((r) => setTimeout(r, 1100));
+      finalizeClaim(db, id, FAST, rule);
+      return getValidatorStats(agent, dbPath)!;
+    }
+
+    const brier = await finalizeWith("brier");
+    const log = await finalizeWith("log");
+
+    // Brier: 1 − (0.9−1)² = 0.99
+    expect(brier.reputation).toBeCloseTo(0.99, 5);
+    // Log: exp(−log(0.9)) = 0.9 — punishes overconfidence harder
+    expect(log.reputation).toBeCloseTo(0.9, 5);
+    // Log is strictly harsher than Brier for a 0.9-confident correct answer
+    expect(log.reputation).toBeLessThan(brier.reputation);
+  });
+
+  it("log rule is exact for a perfectly confident correct answer", async () => {
+    const dbPath = makeDbPath();
+    const id = makeEvidence(dbPath);
+    const db = getDb(dbPath);
+    const agent = "0x60a0Ee9e28b609B740A3588121C7C2B34FE64eF4";
+    attestClaim(db, id, { agent, decision: "SUPPORTED", confidence: 1.0, stake: "100000000000000000000" }, FAST);
+    await new Promise((r) => setTimeout(r, 1100));
+    finalizeClaim(db, id, FAST, "log");
+    const stats = getValidatorStats(agent, dbPath)!;
+    // exp(−log(1)) = 1.0
+    expect(stats.reputation).toBeCloseTo(1.0, 5);
   });
 });

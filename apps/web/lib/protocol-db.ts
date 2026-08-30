@@ -10,6 +10,7 @@ import {
   brierScore,
   canonicalJson,
   finalizeResolution,
+  logScore,
   sha256,
   submitAttestation,
   submitChallenge,
@@ -22,6 +23,9 @@ import {
   type OptimisticConfig,
 } from "@free-web-mcp/evidence";
 type Db = Database.Database;
+
+/** Proper scoring rule for reputation settlement (teacher §9-§10). */
+export type ScoringRule = "brier" | "log";
 
 /** Recompute the resolution root (teacher §21: sha256 over attestations +
  *  challenges + outcome, so settlement is recomputable). This is the SINGLE
@@ -440,13 +444,14 @@ export function finalizeClaim(
   db: Db,
   evidenceId: string,
   config: OptimisticConfig = DEFAULT_OPTIMISTIC_CONFIG,
+  scoringRule: ScoringRule = "brier",
 ): ClaimResolutionState {
   const now = new Date().toISOString();
   const state = withState(db, evidenceId, (s) => finalizeResolution(s, config, now));
   // V2 scoring: after a resolution, update each attestor's reputation via a
-  // strictly proper scoring rule (Brier), rewarding calibration not just
-  // correctness (teacher §9).
-  settleBrierReputations(db, state);
+  // strictly proper scoring rule (Brier or Log — teacher §9), rewarding
+  // calibration not just correctness.
+  settleBrierReputations(db, state, scoringRule);
   // V6: settle challenge bonds — a loser forfeits their bond, a winner gets
   // it back plus a reward; both get reputation updates (teacher's
   // economically-risked judgment: challenges must hurt when wrong).
@@ -454,17 +459,25 @@ export function finalizeClaim(
   return state;
 }
 
-/** Update validator reputations using the Brier score of their confidence
- *  against the final resolution outcome (teacher §9-§10).
- *  reputation = running average of (1 - brier) so 1.0 = perfectly calibrated. */
-export function settleBrierReputations(db: Db, state: ClaimResolutionState): void {
+/** Update validator reputations using a strictly proper scoring rule
+ *  (teacher §9-§10). reputation = running average of the score, so 1.0 =
+ *  perfectly calibrated.
+ *  - "brier": score = 1 − (p−o)²  (quadratic penalty)
+ *  - "log":   score = p(correct)   (exponential penalty; exp(−logScore))
+ *  Both are proper scoring rules; log punishes overconfidence harder. */
+export function settleBrierReputations(
+  db: Db,
+  state: ClaimResolutionState,
+  rule: ScoringRule = "brier",
+): void {
   const result = state.resolution?.result;
   if (result === null || result === undefined) return; // indeterminate — no scoring
 
   for (const att of state.attestations) {
     if (att.decision === "UNCERTAIN") continue; // no probability commitment
-    const brier = brierScore(att.confidence, result);
-    const score = 1 - brier; // 1.0 perfect, 0.0 worst
+    const score = rule === "log"
+      ? Math.exp(-logScore(att.confidence, result)) // p assigned to the true outcome
+      : 1 - brierScore(att.confidence, result);
 
     // Upsert into validators (reuse the existing table so the leaderboard
     // picks it up automatically).

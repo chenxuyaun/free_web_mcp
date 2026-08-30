@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRegistryClient } from "@/lib/blockchain";
 import { getDb, markAnchored } from "@/lib/db";
-import { computeResolutionRoot, finalizeClaim, loadClaimState } from "@/lib/protocol-db";
+import { computeResolutionRoot, finalizeClaim, loadClaimState, type ScoringRule } from "@/lib/protocol-db";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +9,9 @@ export const dynamic = "force-dynamic";
 interface FinalizeBody {
   /** Chain write needs explicit confirm (spec §13 pattern). */
   confirm?: boolean;
+  /** Proper scoring rule for reputation settlement (teacher §9-§10).
+   *  "brier" (default) or "log". */
+  scoringRule?: ScoringRule;
 }
 
 /** POST /api/claims/[id]/finalize — close the challenge window, produce a
@@ -32,7 +35,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   try {
     const db = getDb();
-    const state = finalizeClaim(db, params.id);
+    const rule: ScoringRule = body.scoringRule === "log" ? "log" : "brier";
+    const state = finalizeClaim(db, params.id, undefined, rule);
     const res = state.resolution;
     if (!res) {
       return NextResponse.json(

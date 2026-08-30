@@ -162,15 +162,17 @@ class EvidenceApiClient:
         self,
         evidence_id: str,
         confirm: bool = False,
+        scoring_rule: str | None = None,
     ) -> dict[str, object]:
         """Close the challenge window and produce the final resolution.
         With confirm=True the dashboard anchors the resolution on-chain
         (server-side signer + rate limit). Requires the challenge window
-        to have closed (SUPPORTED) or an active challenge (CHALLENGED)."""
-        return self._post(
-            f"/api/claims/{evidence_id}/finalize",
-            {"confirm": confirm},
-        )
+        to have closed (SUPPORTED) or an active challenge (CHALLENGED).
+        scoring_rule: "brier" (default) or "log" for reputation settlement."""
+        payload: dict[str, object] = {"confirm": confirm}
+        if scoring_rule in ("brier", "log"):
+            payload["scoringRule"] = scoring_rule
+        return self._post(f"/api/claims/{evidence_id}/finalize", payload)
 
     def verify_claim(self, evidence_id: str) -> dict[str, object]:
         """Recompute the resolution root and verify it against the on-chain

@@ -244,10 +244,15 @@ async def test_finalize_claim_posts_confirm() -> None:
         json={"success": True, "state": {"id": "EV-000001", "state": "RESOLVED", "anchored": True}},
     )
     ctx = make_ctx(Settings(log_level="ERROR", evidence_api_url="http://test:3000"))
-    payload = await call_tool(ctx, "finalize_claim", {"evidence_id": "EV-000001", "confirm": True})
+    payload = await call_tool(
+        ctx,
+        "finalize_claim",
+        {"evidence_id": "EV-000001", "confirm": True, "scoring_rule": "log"},
+    )
     assert payload["success"] is True
     sent = json.loads(route.calls.last.request.content)
     assert sent["confirm"] is True
+    assert sent["scoringRule"] == "log"
 
 
 @respx.mock

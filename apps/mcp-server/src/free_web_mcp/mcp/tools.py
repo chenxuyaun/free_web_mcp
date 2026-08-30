@@ -554,10 +554,23 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
             bool,
             Field(description="Pass true to anchor the resolution on-chain (a real transaction)."),
         ] = False,
+        scoring_rule: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "Proper scoring rule for reputation settlement: 'brier' (default) or "
+                    "'log'. Log punishes overconfident wrong answers harder (teacher §9-§10)."
+                ),
+            ),
+        ] = None,
     ) -> dict[str, Any]:
         try:
             client = EvidenceApiClient(ctx.settings.evidence_api_url)
-            return client.finalize_claim(evidence_id=evidence_id, confirm=confirm)
+            return client.finalize_claim(
+                evidence_id=evidence_id,
+                confirm=confirm,
+                scoring_rule=scoring_rule,
+            )
         except ToolError as exc:
             return _error_payload(exc)
 

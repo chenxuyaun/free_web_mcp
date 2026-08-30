@@ -4,6 +4,19 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.9] - 2026-08-30
+
+### Added — V10 configurable proper scoring rules (teacher §9-§10)
+
+- `finalizeClaim` now accepts a scoring rule for reputation settlement:
+  `"brier"` (default, quadratic penalty, score = 1 − (p−o)²) or `"log"`
+  (exponential penalty, score = p assigned to the true outcome — punishes
+  overconfident wrong answers harder).
+- The finalize API accepts `scoringRule` in the body; MCP `finalize_claim`
+  exposes `scoring_rule`; both flow to the same settlement function.
+- 2 web tests (brier 0.99 vs log 0.9 for a 0.9-confident correct answer; log
+  exact at confidence 1.0) + MCP test updated — 83 total.
+
 ## [0.5.8] - 2026-08-30
 
 ### Added — V8 MCP finalize_claim: agents run the whole protocol
