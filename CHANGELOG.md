@@ -4,6 +4,34 @@ All notable changes to `free-web-mcp` are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.22] - 2026-08-31
+
+### Added — 三层链上可验证性增强
+
+- **Merkle tree resolution root**: `computeResolutionRoot` 从扁平
+  sha256(canonicalJson) 升级为真实 Merkle 树——每个 attestation/challenge/
+  outcome 独立成叶子（sha256 投影字段），按 created ASC 排序建树，内部节点
+  sha256(left+right)，奇数层补空节点。新增 `merkleRoot`/`merkleProof`/
+  `verifyMerkleProof`（position-aware proof 条目），可逐条证明单个
+  attestation 而不暴露全集。合约 bytes32 槽位无需改动。
+  线上验证：EV-000036 finalize 锚定 Merkle 根，verify rootMatch=true。
+- **CID 自动发布（Greenfield）**: `POST /api/evidence` 创建成功后异步
+  fire-and-forget 发布证据包到 BNB Greenfield（内容寻址，canonical JSON
+  与链上 hash 字节一致），失败软降级不阻塞创建。citation 信封立即可携带
+  可检索的 CID。
+  线上验证：EV-000037 自动发布，CID 公网可检索。
+- **EIP-712 签名状态转移事件**: 新合约 `TransitionRegistry`
+  （0x5e13a42854faa3b69501a691dd8245b935e21fe1，BSC Testnet）记录
+  claim 的中间状态转移（OBSERVED→SUPPORTED→CHALLENGED→DISPUTED→
+  RESOLVED/EXPIRED），每次转移 ~30k gas。服务端 EIP-712 签名
+  （ClaimTransition typehash），任何人可中继（ecrecover 验证签名者），
+  per-claim nonce 防重放。`withState` 检测状态变化后异步签名发送。
+  线上验证：EV-000038 OBSERVED→SUPPORTED 已上链（nonce 0，
+  signer 0x60a0Ee9e…）。
+
+测试基线：evidence 75 + web 39 + blockchain 9（anvil）+ forge 28（含 7 个
+TransitionRegistry 新测试）全绿。
+
 ## [0.5.21] - 2026-08-30
 
 ### Added — V23-V27 protocol-doc gaps + reputation semantics fix
