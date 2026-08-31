@@ -159,3 +159,99 @@ export const EVIDENCE_REGISTERED_EVENT = {
   name: "EvidenceRegistered",
   type: "event",
 } as const;
+
+/** TransitionRegistry ABI (project 3): EIP-712 signed claim state transitions. */
+export const TRANSITION_REGISTRY_ABI = [
+  {
+    inputs: [{ internalType: "address", name: "serverSigner_", type: "address" }],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    inputs: [{ internalType: "bytes32", name: "claimHash_", type: "bytes32" }],
+    name: "getTransition",
+    outputs: [
+      {
+        components: [
+          { internalType: "bytes32", name: "claimHash", type: "bytes32" },
+          { internalType: "uint8", name: "fromState", type: "uint8" },
+          { internalType: "uint8", name: "toState", type: "uint8" },
+          { internalType: "uint256", name: "timestamp", type: "uint256" },
+          { internalType: "uint256", name: "nonce", type: "uint256" },
+          { internalType: "address", name: "signer", type: "address" },
+          { internalType: "bool", name: "exists", type: "bool" },
+        ],
+        internalType: "struct TransitionRegistry.TransitionRecord",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "bytes32", name: "claimHash_", type: "bytes32" }],
+    name: "nonceOf",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "bytes32", name: "claimHash_", type: "bytes32" },
+      { internalType: "uint8", name: "fromState_", type: "uint8" },
+      { internalType: "uint8", name: "toState_", type: "uint8" },
+      { internalType: "bytes", name: "signature_", type: "bytes" },
+    ],
+    name: "recordTransition",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "domainSeparator",
+    outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "TRANSITION_TYPEHASH",
+    outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "serverSigner",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "bytes32", name: "claimHash", type: "bytes32" },
+      { indexed: false, internalType: "uint8", name: "fromState", type: "uint8" },
+      { indexed: false, internalType: "uint8", name: "toState", type: "uint8" },
+      { indexed: false, internalType: "uint256", name: "timestamp", type: "uint256" },
+      { indexed: false, internalType: "uint256", name: "nonce", type: "uint256" },
+      { indexed: true, internalType: "address", name: "signer", type: "address" },
+    ],
+    name: "TransitionRecorded",
+    type: "event",
+  },
+] as const;
+
+/** State enum values used by TransitionRegistry (uint8). */
+export const CLAIM_STATE_ENUM: Record<string, number> = {
+  DRAFT: 0,
+  OBSERVED: 1,
+  SUPPORTED: 2,
+  CHALLENGED: 3,
+  DISPUTED: 4,
+  RESOLVED: 5,
+  FINAL: 6,
+  EXPIRED: 7,
+};

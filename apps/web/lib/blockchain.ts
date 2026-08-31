@@ -1,6 +1,6 @@
 import "server-only";
 
-import { anvil, bscTestnet, EvidenceRegistryClient, VeriClient } from "@free-web-mcp/blockchain";
+import { anvil, bscTestnet, EvidenceRegistryClient, TransitionRegistryClient, VeriClient } from "@free-web-mcp/blockchain";
 import type { Chain, Hex } from "viem";
 
 export interface RegistryConfig {
@@ -38,6 +38,7 @@ export function getRegistryConfig(): RegistryConfig {
 const globalForBlockchain = globalThis as unknown as {
   __registryClient?: EvidenceRegistryClient;
   __veriClient?: VeriClient;
+  __transitionClient?: TransitionRegistryClient;
 };
 
 export function getRegistryClient(): EvidenceRegistryClient {
@@ -64,5 +65,27 @@ export function getVeriClient(): VeriClient {
     privateKey: (process.env.WALLET_PRIVATE_KEY || undefined) as Hex | undefined,
   });
   globalForBlockchain.__veriClient = client;
+  return client;
+}
+
+/** Project 3: lazily-created TransitionRegistryClient singleton for EIP-712
+ *  signed claim state transitions. Requires TRANSITION_REGISTRY_ADDRESS,
+ *  BSC_RPC_URL, and WALLET_PRIVATE_KEY (the EIP-712 authority). */
+export function getTransitionClient(): TransitionRegistryClient {
+  if (globalForBlockchain.__transitionClient) return globalForBlockchain.__transitionClient;
+  const rpcUrl = process.env.BSC_RPC_URL;
+  const transitionAddress = process.env.TRANSITION_REGISTRY_ADDRESS;
+  if (!rpcUrl || !transitionAddress) {
+    throw new Error(
+      "TransitionRegistry not configured — set BSC_RPC_URL and TRANSITION_REGISTRY_ADDRESS in .env",
+    );
+  }
+  const client = new TransitionRegistryClient({
+    rpcUrl,
+    chain: resolveChain(process.env.BSC_NETWORK),
+    transitionAddress: transitionAddress as Hex,
+    privateKey: (process.env.WALLET_PRIVATE_KEY || undefined) as Hex | undefined,
+  });
+  globalForBlockchain.__transitionClient = client;
   return client;
 }

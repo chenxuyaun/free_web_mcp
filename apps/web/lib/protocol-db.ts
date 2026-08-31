@@ -393,9 +393,42 @@ function withState(
 ): ClaimResolutionState {
   const state = loadClaimState(db, evidenceId);
   if (!state) throw new Error(`Claim ${evidenceId} not found — create evidence first`);
+  const fromState = state.state;
   const updated = fn(state);
   saveState(db, updated);
+  // Project 3: fire-and-forget an EIP-712 signed state transition to the
+  // TransitionRegistry. If the env var is unset (tests, local dev) it's a
+  // silent no-op. Errors are logged but never propagate.
+  if (updated.state !== fromState) {
+    void recordTransitionAsync(evidenceId, state.evidenceHash, fromState, updated.state);
+  }
   return updated;
+}
+
+/** Async: sign (EIP-712) and send a claim state transition to the
+ *  TransitionRegistry on-chain. Fire-and-forget — errors are logged but
+ *  never propagate to the caller. */
+async function recordTransitionAsync(
+  evidenceId: string,
+  evidenceHash: string,
+  fromState: string,
+  toState: string,
+): Promise<void> {
+  try {
+    const addr = process.env.TRANSITION_REGISTRY_ADDRESS;
+    if (!addr) return; // not configured — skip
+    const { getTransitionClient } = await import("@/lib/blockchain");
+    const client = getTransitionClient();
+    await client.recordTransition(
+      `0x${evidenceHash}` as `0x${string}`,
+      fromState,
+      toState,
+    );
+  } catch (e) {
+    console.warn(
+      `[transition] skipped for ${evidenceId} ${fromState}→${toState}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
 }
 
 function protocolId(prefix: string): string {
