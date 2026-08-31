@@ -5,7 +5,8 @@ import {
   type ClaimType,
   type EvidenceSource,
 } from "@free-web-mcp/evidence";
-import { getStats, insertEvidence, listEvidence } from "@/lib/db";
+import { getStats, insertEvidence, listEvidence, markPublished } from "@/lib/db";
+import { getGreenfieldPublisher } from "@/lib/greenfield";
 
 export const dynamic = "force-dynamic";
 
@@ -109,5 +110,28 @@ export async function POST(request: Request) {
   });
 
   const saved = insertEvidence({ pkg, hash, payloadJson: canonicalJson(pkg) });
+
+  // Project 2: auto-publish to BNB Greenfield so the evidence is
+  // content-addressed in decentralized storage and the citation envelope
+  // immediately carries a CID. Fire-and-forget — the record is already
+  // valid without storage, and a failure must never block creation
+  // (the publish route remains for manual retry).
+  void autoPublish(saved.id, canonicalJson(pkg));
+
   return NextResponse.json({ success: true, id: saved.id, hash, package: saved });
+}
+
+/** Best-effort publish of an evidence package to Greenfield. */
+async function autoPublish(id: string, payloadJson: string): Promise<void> {
+  try {
+    const publisher = getGreenfieldPublisher();
+    const result = await publisher.publish(payloadJson);
+    markPublished(id, result.uri);
+    console.log(`[evidence] auto-published ${id} → ${result.uri}`);
+  } catch (e) {
+    // Soft failure — the record stays valid; publish/route.ts can retry.
+    console.warn(
+      `[evidence] auto-publish skipped for ${id}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
 }
