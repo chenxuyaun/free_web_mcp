@@ -10,11 +10,10 @@ import {
   applyEmissionCaps,
   arbitrateResolution,
   brierScore,
-  canonicalJson,
+  computeMerkleRoot,
   expireClaim as engineExpireClaim,
   finalizeResolution,
   logScore,
-  sha256,
   submitAttestation,
   submitChallenge,
   DEFAULT_OPTIMISTIC_CONFIG,
@@ -30,36 +29,13 @@ type Db = Database.Database;
 /** Proper scoring rule for reputation settlement (teacher §9-§10). */
 export type ScoringRule = "brier" | "log";
 
-/** Recompute the resolution root (teacher §21: sha256 over attestations +
- *  challenges + outcome, so settlement is recomputable). This is the SINGLE
+/** Recompute the resolution root (teacher §21: a Merkle tree over
+ *  attestations + challenges + outcome, so settlement is recomputable and an
+ *  individual attestation can be proven against the root). This is the SINGLE
  *  source of truth — both the finalize route (anchoring) and the verify
  *  route (on-chain check) must use it so the local root always matches. */
 export function computeResolutionRoot(state: ClaimResolutionState): string {
-  const res = state.resolution;
-  if (!res) throw new Error("No resolution to compute a root from");
-  const rootInput = {
-    attestations: state.attestations.map((a) => ({
-      agent: a.agent,
-      decision: a.decision,
-      confidence: a.confidence,
-      stake: a.stake,
-      model: a.model ?? null,
-      searchProvider: a.searchProvider ?? null,
-      sources: a.sources ?? null,
-      reputation: a.reputation ?? null,
-      slashed: a.slashed ?? false,
-    })),
-    challenges: state.challenges.map((c) => ({
-      challenger: c.challenger,
-      bond: c.bond,
-      state: c.state,
-      challengerWon: c.challengerWon ?? null,
-    })),
-    result: res.result,
-    finalProbability: res.finalProbability,
-    method: res.method,
-  } as unknown as Parameters<typeof canonicalJson>[0];
-  return sha256(canonicalJson(rootInput));
+  return computeMerkleRoot(state);
 }
 
 // ---------------------------------------------------------------------------

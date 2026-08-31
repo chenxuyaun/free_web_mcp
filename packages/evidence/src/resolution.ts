@@ -22,6 +22,7 @@ import {
   determineResolutionTier,
   logitPool,
 } from "./protocol";
+import { canonicalJson, merkleRoot, sha256 } from "./hash";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -497,4 +498,63 @@ export function arbitrateResolution(
     resolution,
     updatedAt: now,
   };
+}
+// ---------------------------------------------------------------------------
+// Merkle resolution root (teacher §21)
+// ---------------------------------------------------------------------------
+
+/** Project an attestation to the whitelisted fields that are committed to
+ *  the Merkle tree. Deterministic — the same attestation always produces the
+ *  same leaf regardless of SQLite round-trip ordering of optional fields. */
+export function attestationLeaf(att: Attestation): string {
+  const leafInput = {
+    agent: att.agent,
+    decision: att.decision,
+    confidence: att.confidence,
+    stake: att.stake,
+    model: att.model ?? null,
+    searchProvider: att.searchProvider ?? null,
+    sources: att.sources ?? null,
+    reputation: att.reputation ?? null,
+    slashed: att.slashed ?? false,
+  };
+  return sha256(canonicalJson(leafInput as unknown as Parameters<typeof canonicalJson>[0]));
+}
+
+/** Project a challenge to its committed leaf. */
+export function challengeLeaf(ch: Challenge): string {
+  const leafInput = {
+    challenger: ch.challenger,
+    bond: ch.bond,
+    state: ch.state,
+    challengerWon: ch.challengerWon ?? null,
+  };
+  return sha256(canonicalJson(leafInput as unknown as Parameters<typeof canonicalJson>[0]));
+}
+
+/** The outcome (resolution result) leaf — commits result + probability +
+ *  method so the root binds the final truth outcome too. */
+export function outcomeLeaf(res: ClaimResolution): string {
+  const leafInput = {
+    result: res.result,
+    finalProbability: res.finalProbability,
+    method: res.method,
+  };
+  return sha256(canonicalJson(leafInput as unknown as Parameters<typeof canonicalJson>[0]));
+}
+
+/** Compute the Merkle resolution root (teacher §21): leaves are the
+ *  per-attestation, per-challenge and outcome hashes, ordered
+ *  attestations (created ASC) → challenges (created ASC) → outcome.
+ *  Deterministic and recomputable — any single leaf change flips the root,
+ *  and a proof can verify one attestation without revealing the rest. */
+export function computeMerkleRoot(state: ClaimResolutionState): string {
+  const res = state.resolution;
+  if (!res) throw new Error("No resolution to compute a root from");
+  const leaves = [
+    ...state.attestations.map((a) => attestationLeaf(a)),
+    ...state.challenges.map((c) => challengeLeaf(c)),
+    outcomeLeaf(res),
+  ];
+  return merkleRoot(leaves);
 }

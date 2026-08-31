@@ -1,6 +1,7 @@
 export { extractClaims, classifyClaim } from "./claims";
 export { EvidenceEngine } from "./engine";
 export { canonicalJson, evidenceHash, sha256 } from "./hash";
+export { merkleRoot, combineHash, merkleProof, verifyMerkleProof, type MerkleProofEntry } from "./hash";
 export { buildEvidencePackage } from "./package";
 export type {
   Claim,
@@ -40,6 +41,10 @@ export {
 export {
   applyEmissionCaps,
   arbitrateResolution,
+  attestationLeaf,
+  challengeLeaf,
+  computeMerkleRoot,
+  outcomeLeaf,
   expireClaim,
   submitAttestation,
   submitChallenge,
