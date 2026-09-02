@@ -8,8 +8,9 @@
 
 | 项 | 状态 |
 | --- | --- |
-| 申请邮件（binanceconnect@binance.com，发件邮箱 **yueshewushuang@gmail.com**） | ✅ 2026-08-29 已发送 |
+| 申请邮件（binanceconnect@binance.com，发件邮箱 **yueshewushuang@gmail.com**） | ✅ 2026-08-29 已发送（Gmail 已发送箱确认，15:47 CST） |
 | RSA 密钥对（deploy/b402/，公钥已随邮件提交） | ✅ |
+| **跟进邮件**（binanceconnect@binance.com，发件邮箱 yueshen@agent.qq.com） | ✅ 2026-09-02 已发送（第 3 个工作日，正文引用 Gmail 联系邮箱 + issue #28） |
 | 官方回信（clientId/accessToken） | ⏳ 等待中（回信会进 Gmail，需转发到 yueshen@agent.qq.com 由 Agent 接管） |
 | 开源备胎（自托管 relayer，testnet 已验通） | ✅ 随时可用 |
 
@@ -18,17 +19,23 @@
 | 通道 | 结果 |
 | --- | --- |
 | Google Form（forms.gle/aUQvxUETfGMzyTky5，文档唯一入口） | ❌ 组织限制，外部账号无法打开 |
-| 邮件 binanceconnect@binance.com（文档确认的联系邮箱） | ✅ 已发（唯一可行官方通道） |
+| 邮件 binanceconnect@binance.com（文档确认的联系邮箱） | ✅ 已发（唯一可行官方通道）；09-02 无回信后已跟进 |
 | Vistara-Labs/b402 仓库（开源实现） | ❌ 已归档只读，无联系人 |
-| bnb-chain/mpp-sdk（BNB Chain 官方 SDK） | ✅ [issue #28 已开](https://github.com/bnb-chain/mpp-sdk/issues/28)（2026-08-29，提前于原计划） |
+| bnb-chain/mpp-sdk（BNB Chain 官方 SDK） | ✅ [issue #28 已开](https://github.com/bnb-chain/mpp-sdk/issues/28)（2026-08-29，提前于原计划）；09-02 检查仍 open、0 评论 |
+
+## 巡检记录
+
+- **2026-08-31**：三通道（QQ 邮箱收/垃圾、Gmail from:binanceconnect、issue #28）均无回信。
+- **2026-09-02**：三通道均无回信（申请后第 3 个工作日）。确认申请邮件在 Gmail
+  已发送箱（08-29 15:47）。发送跟进邮件（agent QQ 邮箱 → binanceconnect，
+  主题 "Re: B402 / OnchainPay x402 — Sandbox Developer Account Application"，
+  正文含申请信息、Gmail 联系邮箱、issue #28 链接）。用户确认后发送。
 
 ## 跟进计划
 
-- **第 3 个工作日**（约 09-03）：无回信则发跟进邮件（模板见下）
-- **2026-08-29（提前执行）**：已在 bnb-chain/mpp-sdk 开 [issue #28](https://github.com/bnb-chain/mpp-sdk/issues/28)
-  询问 Sandbox 接入指引（原计划 09-09，为加速获取提前）
-- **并行**：加入 BNB Chain 开发者社区（Discord/Telegram）问 B402 接入，
-  社区经理常能加速
+- ~~第 3 个工作日发跟进邮件~~ ✅ 已于 09-02 执行
+- **09-05 或之后**：仍无回信则再跟进一次（这次从 Gmail 回复原邮件线程，
+  并考虑 BNB Chain 开发者社区 Discord/Telegram 加速）
 - 任何回信：把 clientId/accessToken 写入服务器 .env，开做支付网关
 
 ## 跟进邮件模板（第 3 个工作日发送）
