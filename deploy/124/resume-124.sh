@@ -5,6 +5,9 @@
 #   WALLET_PRIVATE_KEY=0x你的私钥 \
 #     ssh -p 55991 ubuntu@124.221.130.64 "WALLET_PRIVATE_KEY='0x你的私钥' bash -s" < deploy/124/resume-124.sh
 set -euo pipefail
+# 国内网络：PyPI 走清华镜像 + 放宽超时（实测 30s 默认值不够）
+export UV_DEFAULT_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"
+export UV_HTTP_TIMEOUT=120
 export PATH="$HOME/.local/bin:$PATH"
 REPO_DIR="/home/ubuntu/free_web_mcp"
 WEB_PORT=3100

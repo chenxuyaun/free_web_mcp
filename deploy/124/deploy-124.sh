@@ -7,6 +7,9 @@
 #
 # 幂等：重复执行会拉取最新代码并重启服务。密钥只落在服务器上的 .env（chmod 600）。
 set -euo pipefail
+# 国内网络：PyPI 走清华镜像 + 放宽超时（实测 30s 默认值不够）
+export UV_DEFAULT_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"
+export UV_HTTP_TIMEOUT=120
 
 REPO_DIR="${REPO_DIR:-/home/ubuntu/free_web_mcp}"
 WEB_PORT="${WEB_PORT:-3100}"
