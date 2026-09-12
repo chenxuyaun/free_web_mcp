@@ -51,6 +51,7 @@ fi
 
 echo "==> 4/6 MCP 服务器 (127.0.0.1:$MCP_PORT, EVIDENCE_API_URL 指向本机看板)"
 cd apps/mcp-server
+uv python install 3.12
 uv sync --frozen
 cd "$REPO_DIR"
 
