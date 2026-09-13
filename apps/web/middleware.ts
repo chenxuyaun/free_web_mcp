@@ -15,6 +15,16 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const OPEN_PATHS = ["/api/health"];
 
+/**
+ * Reads stay open, writes need the key.
+ *
+ * The edge (nginx) already draws the line this way, and the two layers must agree: gating GETs
+ * too would break the owner's own dashboard, whose pages fetch their data through this API from a
+ * browser that has no way to send the header. The writes — evidence creation, claim state
+ * transitions, and above all the gas-spending anchor route — are what must be protected.
+ */
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 function withBasePath(pathname: string): boolean {
   // next.config.mjs sets basePath=/webmcp; middleware sees the full incoming path.
   return pathname.includes("/api/");
@@ -26,6 +36,7 @@ export function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
   if (!withBasePath(pathname)) return NextResponse.next();
+  if (READ_METHODS.has(req.method)) return NextResponse.next();
   const normalized = pathname.replace(/^\/webmcp/, "");
   if (OPEN_PATHS.some((p) => normalized === p || normalized.startsWith(`${p}/`))) {
     return NextResponse.next();
