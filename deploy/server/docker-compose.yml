@@ -4,9 +4,8 @@
       "image": "free-web-mcp/web:latest",
       "restart": "unless-stopped",
       "command": [
-        "pnpm",
-        "exec",
-        "next",
+        "node",
+        "/app/apps/web/node_modules/next/dist/bin/next",
         "start",
         "-p",
         "3000",
