@@ -66,3 +66,10 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST https://yuncai.site/mcp -H "X-A
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"v","version":"1"}}}'  # 期望 200
 curl -s https://yuncai.site/mcp-health                                                                # 期望 status ok
 ```
+
+6. **别用 `nohup ... docker build ... &` 起后台构建**：ssh 会话结束时它会被 SIGHUP 杀掉（日志停在半途、看起来像网络问题），
+   而且**它有可能在你以为已经失败之后才完成**，并把 `free-web-mcp/web:latest` 重新指向一个旧代码的镜像——
+   实测发生过一次：孤儿构建完成后 `latest` 变成了「读接口也返回 401」的旧 middleware 版本，
+   而运行中的容器还是好的；下次 `docker compose up -d web` 就会把看板换成坏的。
+   **一律用 `systemd-run --unit=webbuild ... docker build`**（本仓库的 rebuild-web-image.sh 就是这么做的），
+   构建完必须**行为验证新镜像**（在备用端口 `docker run` 一次，读 200 / 写 401），再 `compose up -d`。
