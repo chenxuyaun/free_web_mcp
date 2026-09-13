@@ -13,6 +13,12 @@ REPO_DIR="/home/ubuntu/free_web_mcp"
 WEB_PORT=3100
 MCP_PORT=10000
 
+echo "==> 3.5/6 拉取最新代码(含访问密钥闸门)"
+cd "$REPO_DIR"
+git fetch origin && git reset --hard origin/main
+pnpm install --frozen-lockfile
+pnpm --filter @free-web-mcp/web build
+
 echo "==> 4/6 修复 Python 并同步 MCP 依赖"
 cd "$REPO_DIR/apps/mcp-server"
 echo "3.12" > .python-version
