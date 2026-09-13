@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getRegistryClient } from "@/lib/blockchain";
 import { getEvidenceHash, getEvidencePackage, getGreenfieldUri, markAnchored } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
+import { apiAuthorized, configuredKey } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,33 @@ interface AnchorBody {
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  // Rate limit anchoring (spec §30): 20 anchors / 60s per client IP — a
-  // permanent on-chain write should not be spammable.
+  // This route spends the server wallet's gas on a permanent public transaction, so it fails
+  // CLOSED: unlike the read routes, an unconfigured secret is a refusal rather than a pass. The
+  // middleware gates it too when a key is set — this is the second, route-local check because
+  // the cost of a mistake here is money and an immutable record.
+  if (!configuredKey()) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          type: "UNAUTHORIZED",
+          message:
+            "Anchoring is disabled until DASHBOARD_API_KEY is configured on the server "
+            + "(this route spends the signer wallet's gas).",
+        },
+      },
+      { status: 403 },
+    );
+  }
+  if (!apiAuthorized(request)) {
+    return NextResponse.json(
+      { success: false, error: { type: "UNAUTHORIZED", message: "Missing or wrong X-API-Key." } },
+      { status: 401 },
+    );
+  }
+
+  // Rate limit anchoring (spec §30): 20 anchors / 60s per client — a permanent on-chain write
+  // should not be spammable. Keyed on the proxy-set address, not a client-supplied header.
   const rl = rateLimit(request, { limit: 20, windowMs: 60_000 });
   if (!rl.ok) {
     return NextResponse.json(

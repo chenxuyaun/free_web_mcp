@@ -1,9 +1,10 @@
 """FastAPI application for the HTTP transport: /health plus mounted MCP."""
 
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from mcp.server.transport_security import TransportSecuritySettings
 
@@ -13,6 +14,17 @@ from free_web_mcp.logging import get_logger
 from free_web_mcp.mcp.server import create_mcp_server
 
 logger = get_logger(__name__)
+
+
+def _presented_key(request: Request) -> str:
+    """The caller's key, from X-API-Key or a Bearer token."""
+    direct = request.headers.get("x-api-key") or ""
+    if direct:
+        return direct.strip()
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return ""
 
 
 def create_app(ctx: AppContext | None = None) -> FastAPI:
@@ -41,6 +53,26 @@ def create_app(ctx: AppContext | None = None) -> FastAPI:
                 await ctx.aclose()
 
     app = FastAPI(title=ctx.settings.app_name, lifespan=lifespan)
+    api_key = (ctx.settings.mcp_api_key or "").strip()
+
+    @app.middleware("http")
+    async def require_api_key(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """Gate the MCP endpoint behind a shared key when one is configured.
+
+        Measured exposure before this existed: the public URL accepted anonymous
+        tools/call, so any scanner could use the server as a free search proxy and
+        drive evidence/anchor writes. /health and the discovery doc stay open so
+        monitoring keeps working; with no key configured nothing changes, which is
+        only appropriate for a 127.0.0.1-bound dev instance.
+        """
+        if api_key and request.url.path.rstrip("/") == "/mcp":
+            if not secrets.compare_digest(_presented_key(request), api_key):
+                logger.warning("mcp: rejected unauthenticated call from %s", request.client)
+                return JSONResponse(
+                    {"error": "unauthorized", "detail": "missing or wrong X-API-Key"},
+                    status_code=401,
+                )
+        return await call_next(request)
 
     @app.get("/health")
     def health() -> dict[str, str]:

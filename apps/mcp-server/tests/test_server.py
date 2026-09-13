@@ -17,7 +17,7 @@ def app() -> AppContext:
 
 @pytest.fixture
 async def client(app):
-    transport = httpx.ASGITransport(app=app)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
         yield c
 
@@ -107,3 +107,75 @@ async def test_well_known_max_results_has_constraints(client: httpx.AsyncClient)
     assert props["max_results"]["maximum"] == 10
     assert "description" in props["max_results"]
     assert "description" in props["query"]
+
+
+# ── API key gate (measured exposure: the public URL accepted anonymous tools/call) ──
+
+@pytest.fixture
+def keyed_app() -> AppContext:
+    return create_app(AppContext.create(Settings(log_level="ERROR", mcp_api_key="s3cret-key")))
+
+
+@pytest.fixture
+async def keyed_client(keyed_app):
+    transport = httpx.ASGITransport(app=keyed_app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+        yield c
+
+
+async def test_keyed_server_rejects_anonymous_mcp_calls(keyed_client: httpx.AsyncClient) -> None:
+    r = await keyed_client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    assert r.status_code == 401
+    assert r.json()["error"] == "unauthorized"
+
+
+async def test_keyed_server_rejects_a_wrong_key(keyed_client: httpx.AsyncClient) -> None:
+    r = await keyed_client.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+        headers={"X-API-Key": "wrong"},
+    )
+    assert r.status_code == 401
+
+
+async def test_keyed_server_accepts_the_key_by_header_or_bearer(keyed_client: httpx.AsyncClient) -> None:
+    body = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "t", "version": "1"},
+        },
+    }
+    for headers in ({"X-API-Key": "s3cret-key"}, {"Authorization": "Bearer s3cret-key"}):
+        r = await keyed_client.post("/mcp", json=body, headers=headers)
+        # The gate is what is under test here; a successful handshake also needs the MCP
+        # session manager's lifespan, which ASGITransport does not run.
+        assert r.status_code != 401, f"{headers} should pass the gate"
+
+
+async def test_health_stays_open_on_a_keyed_server(keyed_client: httpx.AsyncClient) -> None:
+    r = await keyed_client.get("/health")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
+
+
+async def test_unkeyed_server_is_not_gated(client: httpx.AsyncClient) -> None:
+    r = await client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "t", "version": "1"},
+            },
+        },
+    )
+    # No key configured = no gate (the 127.0.0.1 dev case). The handshake itself needs the MCP
+    # lifespan, which ASGITransport does not run — the gate is what this asserts.
+    assert r.status_code != 401

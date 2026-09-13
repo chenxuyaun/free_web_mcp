@@ -147,9 +147,13 @@ def extract_quote(text: str, claim: str, max_chars: int = 240) -> str | None:
 class EvidenceApiClient:
     """Thin HTTP client for the dashboard's evidence API."""
 
-    def __init__(self, base_url: str, timeout: float = 10.0) -> None:
+    def __init__(self, base_url: str, timeout: float = 10.0, api_key: str = "") -> None:
         self._base = base_url.rstrip("/")
         self._timeout = timeout
+        # The dashboard gates /api/* behind DASHBOARD_API_KEY when set; this service is a
+        # first-party caller, so it presents the same secret. Empty = the dashboard has no gate
+        # (local dev only).
+        self._headers = {"X-API-Key": api_key} if api_key else {}
 
     def create_evidence_record(
         self,
@@ -265,7 +269,9 @@ class EvidenceApiClient:
 
     def _post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
         try:
-            response = httpx.post(f"{self._base}{path}", json=payload, timeout=self._timeout)
+            response = httpx.post(
+                f"{self._base}{path}", json=payload, timeout=self._timeout, headers=self._headers
+            )
         except httpx.HTTPError as exc:
             raise ToolError(
                 ErrorCode.FETCH_FAILED,
@@ -275,7 +281,7 @@ class EvidenceApiClient:
 
     def _get(self, path: str) -> dict[str, object]:
         try:
-            response = httpx.get(f"{self._base}{path}", timeout=self._timeout)
+            response = httpx.get(f"{self._base}{path}", timeout=self._timeout, headers=self._headers)
         except httpx.HTTPError as exc:
             raise ToolError(
                 ErrorCode.FETCH_FAILED,

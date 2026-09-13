@@ -440,7 +440,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         ] = False,
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             result = client.create_evidence_record(
                 claim=claim,
                 claim_type="fact",
@@ -466,7 +466,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.get_evidence(evidence_id)
         except ToolError as exc:
             return _error_payload(exc)
@@ -486,7 +486,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.get_claim_state(evidence_id)
         except ToolError as exc:
             return _error_payload(exc)
@@ -507,7 +507,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.get_citation(evidence_id)
         except ToolError as exc:
             return _error_payload(exc)
@@ -539,7 +539,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         sources: Annotated[list[str] | None, Field(description="Source pages read, e.g. [\"https://…\"], deduplicated.")] = None,
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.attest_claim(
                 evidence_id=evidence_id,
                 agent=agent,
@@ -573,7 +573,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         reason: Annotated[str, Field(description="Why the attestation is wrong.")] = "Evidence does not support the claim",
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.challenge_claim(
                 evidence_id=evidence_id,
                 challenger=challenger,
@@ -614,7 +614,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         ] = None,
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.finalize_claim(
                 evidence_id=evidence_id,
                 confirm=confirm,
@@ -640,7 +640,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         evidence_id: Annotated[str, Field(description="Evidence id in the form EV-XXXXXX.")],
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.verify_claim(evidence_id=evidence_id)
         except ToolError as exc:
             return _error_payload(exc)
@@ -670,7 +670,7 @@ def register_tools(server: MCPServer, ctx: AppContext) -> None:
         ] = False,
     ) -> dict[str, Any]:
         try:
-            client = EvidenceApiClient(ctx.settings.evidence_api_url)
+            client = EvidenceApiClient(ctx.settings.evidence_api_url, api_key=ctx.settings.mcp_api_key)
             return client.arbitrate_claim(
                 evidence_id=evidence_id,
                 result=result,

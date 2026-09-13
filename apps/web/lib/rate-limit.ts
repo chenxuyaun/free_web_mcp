@@ -14,10 +14,21 @@ export interface RateLimitConfig {
 }
 
 function clientIp(req: Request): string {
+  // Trust order matters. `x-real-ip` is set by our own reverse proxy (nginx: proxy_set_header
+  // X-Real-IP $remote_addr), which *replaces* whatever the client sent — so it survives a
+  // malicious header. `x-forwarded-for` is client-suppliable and was previously read from the
+  // FIRST entry: sending a fresh fake IP per request defeated every limit (measured against the
+  // anchor route, whose only other gate is a JSON field). The last entry is the one appended by
+  // the nearest proxy, so it is the best available fallback when x-real-ip is absent.
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
   const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
+  if (fwd) {
+    const parts = fwd.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
   const cf = req.headers.get("cf-connecting-ip");
-  if (cf) return cf;
+  if (cf) return cf.trim();
   return "unknown";
 }
 

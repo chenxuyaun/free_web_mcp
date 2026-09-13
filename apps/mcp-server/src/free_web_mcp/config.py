@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Evidence API (the Next.js dashboard owns evidence persistence)
     evidence_api_url: str = "http://127.0.0.1:3000"
 
+    # Shared secret for the MCP endpoint (X-API-Key or Authorization: Bearer). Empty = no gate,
+    # which is only safe when the server is bound to 127.0.0.1; a public deployment must set it.
+    mcp_api_key: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
